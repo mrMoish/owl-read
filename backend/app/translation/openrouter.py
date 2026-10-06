@@ -2,11 +2,11 @@
 from __future__ import annotations
 import asyncio
 import json
+import logging
 import re
 import httpx
-import logging
-log = logging.getLogger("uvicorn.error")
 
+log = logging.getLogger("uvicorn.error")
 URL = "https://openrouter.ai/api/v1/chat/completions"
 CYR = re.compile(r"[А-Яа-яЁё]")
 SYSTEM = (
@@ -62,6 +62,12 @@ class OpenRouterClient:
             for attempt in range(3):
                 try:
                     r = await http.post(URL, json=body, headers=headers)
+                    if r.status_code == 400 and "response_format" in body:
+                        body.pop("response_format")  # модель не поддерживает JSON-режим
+                        log.warning("400 от OpenRouter, повторяю без response_format")
+                        continue
+                    if r.status_code in (401, 402, 403):  # ключ/лимит: повторять бессмысленно
+                        raise TranslationError(f"OpenRouter {r.status_code}: {r.text[:200]}")
                     if r.status_code in (429, 500, 502, 503, 504):
                         raise TranslationError(f"OpenRouter {r.status_code}")
                     r.raise_for_status()
@@ -69,8 +75,9 @@ class OpenRouterClient:
                     return parse_response(content, {i["id"] for i in items})
                 except (httpx.HTTPError, TranslationError, KeyError, IndexError, ValueError) as e:
                     last = e
-                    body = getattr(getattr(e, "response", None), "text", "")[:300]
-                    log.warning("OpenRouter попытка %s не удалась: %s %s", attempt + 1, e, body)
+                    log.warning("OpenRouter попытка %s не удалась: %s", attempt + 1, e)
+                    if isinstance(e, TranslationError) and "OpenRouter 40" in str(e):
+                        break
                     await asyncio.sleep(0.8 * (attempt + 1))
         finally:
             if own:

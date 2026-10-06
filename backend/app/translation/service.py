@@ -2,11 +2,11 @@
 from __future__ import annotations
 import asyncio
 import hashlib
+import logging
 import math
 from .openrouter import OpenRouterClient, TranslationError
-import logging
-log = logging.getLogger("uvicorn.error")
 
+log = logging.getLogger("uvicorn.error")
 LANG = "es-AR"
 CHUNK = 40
 

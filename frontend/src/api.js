@@ -1,5 +1,6 @@
-async function j(url, opts) {
-  const r = await fetch(url, { cache: "no-store", ...opts });
+const BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+async function j(path, opts) {
+  const r = await fetch(`${BASE}${path}`, { cache: "no-store", ...opts });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }

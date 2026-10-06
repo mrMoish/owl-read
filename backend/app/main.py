@@ -1,6 +1,8 @@
 from __future__ import annotations
 import logging
+import os
 from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import Settings, get_settings
 from .daily import DailyService
@@ -21,6 +23,10 @@ def create_app(settings: Settings | None = None, fetch=None) -> FastAPI:
     tr = TranslationService(store, client, s.translate_max_share)
     daily = DailyService(s, store, tr, **({"fetch": fetch} if fetch else {}))
     app = FastAPI(title="Daily Reader")
+    origins = [o.strip().rstrip("/") for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+    if origins:  # frontend на другом домене (Vercel)
+        app.add_middleware(CORSMiddleware, allow_origins=origins,
+                           allow_methods=["GET", "POST"], allow_headers=["*"])
 
     @app.get("/api/health")
     def health():
