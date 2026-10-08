@@ -1,15 +1,52 @@
 import React from "react";
 
-/** Рендерит узлы текста. Выбранные слова ЗАМЕНЯЮТСЯ испанскими (русское слово не показывается). */
-function Nodes({ nodes, shown, tr }) {
-  return nodes.map((n, i) => {
+function flattenText(nodes = []) {
+  return nodes.map((n) => {
     if (n.t === "text") return n.s;
-    if (n.t === "w") return shown.has(n.id) ? <span key={i} className="es" lang="es-AR">{tr[n.id]}</span> : n.s;
-    const kids = <Nodes nodes={n.c} shown={shown} tr={tr} />;
-    if (n.t === "em") return <em key={i}>{kids}</em>;
-    if (n.t === "strong") return <strong key={i}>{kids}</strong>;
-    if (n.t === "a") return <a key={i} href={n.href} target="_blank" rel="noopener noreferrer">{kids}</a>;
-    return null;
-  });
+    if (n.c) return flattenText(n.c);
+    return "";
+  }).join("");
 }
-export default React.memo(Nodes);
+
+function Node({ node, index, translations, onWordClick, meta }) {
+  if (node.t === "text") return node.s;
+  if (node.t === "w") {
+    const id = String(node.id);
+    const word = node.s;
+    const info = meta[id] || {};
+    const translated = translations[id];
+    const content = translated || word;
+    return (
+      <button
+        key={index}
+        type="button"
+        className={translated ? "word word--translated" : "word"}
+        onClick={() => onWordClick({
+          id: node.id,
+          word,
+          lemma: info.lemma || word,
+          sentence: info.sent || "",
+          context: "",
+        })}
+        aria-label={translated ? `Вернуть слово ${word}` : `Перевести слово ${word}`}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  const children = Array.isArray(node.c) ? node.c.map((child, idx) => (
+    <Node key={`${node.t}-${idx}`} node={child} index={idx} translations={translations} onWordClick={onWordClick} meta={meta} />
+  )) : null;
+
+  if (node.t === "em") return <em>{children}</em>;
+  if (node.t === "strong") return <strong>{children}</strong>;
+  if (node.t === "a") return <a href={node.href} target="_blank" rel="noopener noreferrer">{children}</a>;
+  return <>{children}</>;
+}
+
+export default function RichText({ nodes = [], translations = {}, onWordClick, meta = {} }) {
+  return nodes.map((node, index) => (
+    <Node key={`${index}-${node.t}`} node={node} index={index} translations={translations} onWordClick={onWordClick} meta={meta} />
+  ));
+}

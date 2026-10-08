@@ -5,4 +5,8 @@ async function j(path, opts) {
   return r.json();
 }
 export const fetchDaily = (date) => j(`/api/daily?date=${date}`);
-export const requestTranslations = (date) => j(`/api/daily/translations?date=${date}`, { method: "POST" });
+export const translateWord = (payload) => j(`/api/translate`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+});

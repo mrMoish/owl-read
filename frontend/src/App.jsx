@@ -1,17 +1,67 @@
-import React, { useMemo, useState } from "react";
-import { useDaily } from "./useDaily.js";
-import { loadPercent, savePercent } from "./lib/storage.js";
-import { pickShown } from "./lib/selection.js";
+import React, { useEffect, useMemo, useState } from "react";
+import { translateWord } from "./api.js";
+import { loadTranslations, saveTranslations } from "./lib/storage.js";
 import Scripture from "./components/Scripture.jsx";
 import Comment from "./components/Comment.jsx";
-import SettingsFab from "./components/SettingsFab.jsx";
+import { useDaily } from "./useDaily.js";
+
+function flattenText(nodes) {
+  return nodes.map((n) => {
+    if (n.t === "text") return n.s;
+    if (n.c) return flattenText(n.c);
+    return "";
+  }).join("");
+}
+
+function articleContext(data) {
+  if (!data) return "";
+  const blocks = [data.verse, ...(data.comment || [])];
+  return blocks.map((block) => flattenText(block.nodes || [])).join(" ");
+}
 
 export default function App() {
   const { data, loading, error, notice, reload } = useDaily();
-  const [percent, setPercent] = useState(loadPercent);
-  const tr = data?.translations;
-  const shown = useMemo(() => pickShown(data?.order, tr, percent), [data?.order, tr, percent]);
-  const set = (v) => { setPercent(v); savePercent(v); };
+  const [manualTranslations, setManualTranslations] = useState({});
+
+  useEffect(() => {
+    if (!data?.date) return;
+    setManualTranslations(loadTranslations(data.date));
+  }, [data?.date]);
+
+  useEffect(() => {
+    if (!data?.date) return;
+    saveTranslations(data.date, manualTranslations);
+  }, [data?.date, manualTranslations]);
+
+  const baseTranslations = data?.translations || {};
+  const visibleTranslations = useMemo(() => ({ ...baseTranslations, ...manualTranslations }), [baseTranslations, manualTranslations]);
+
+  const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
+    if (!data?.date || !sentence) return;
+    const key = String(id);
+    if (visibleTranslations[key]) {
+      setManualTranslations((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+    try {
+      const res = await translateWord({
+        word,
+        lemma: lemma || word,
+        sentence,
+        context: context || articleContext(data),
+        date: data.date,
+      });
+      const translated = res?.translation || res?.original || word;
+      if (!translated || translated === word) return;
+      setManualTranslations((prev) => ({ ...prev, [key]: translated }));
+    } catch {
+      // Ошибка перевода не ломает UX: слово остаётся русским.
+    }
+  };
 
   return (
     <>
@@ -20,8 +70,8 @@ export default function App() {
         {data ? (
           <article>
             <h1>{data.date_label}</h1>
-            <Scripture block={data.verse} shown={shown} tr={tr || {}} />
-            <Comment blocks={data.comment} shown={shown} tr={tr || {}} />
+            <Scripture block={data.verse} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} />
+            <Comment blocks={data.comment} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} />
             {data.title && <p className="source">{data.title}</p>}
           </article>
         ) : loading ? (
@@ -30,7 +80,6 @@ export default function App() {
           <div className="notice"><p>{error}</p><button onClick={reload}>Повторить</button></div>
         )}
       </main>
-      <SettingsFab percent={percent} onChange={set} status={data?.translations_status} />
     </>
   );
 }
