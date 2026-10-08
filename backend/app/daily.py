@@ -67,5 +67,6 @@ class DailyService:
     def public(self, content: dict, translations: dict, status: str, notice=None) -> dict:
         return {"date": content["date"], "date_label": content["date_label"], "title": content["title"],
                 "verse": content["verse"], "comment": content["comment"], "order": content["order"],
+                "meta": {str(k): v for k, v in content.get("meta", {}).items()},
                 "translations": {str(k): v for k, v in translations.items()},
                 "translations_status": status, "notice": notice}
