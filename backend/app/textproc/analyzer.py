@@ -1,24 +1,17 @@
-"""Токенизация, лемматизация (pymorphy3), частотность (wordfreq), контекст предложения.
+"""Токенизация, лемматизация (pymorphy3), контекст предложения.
 
 Текстовые узлы блока заменяются последовательностью:
-  {"t":"w","id":N,"s":"слово"}  — кандидат на перевод
-  {"t":"text","s":"..."}         — всё остальное
+  {"t":"w","id":N,"s":"слово"}  — интерактивное русское слово
+  {"t":"text","s":"..."}         — всё остальное (пробелы, пунктуация, цифры)
 """
 from __future__ import annotations
 import bisect
 import re
 from functools import lru_cache
 import pymorphy3
-from wordfreq import zipf_frequency
 
 WORD_RE = re.compile(r"[А-Яа-яЁё]+(?:-[А-Яа-яЁё]+)*")
-SENT_RE = re.compile(r"(?<=[.!?…])[»\")]*\s+(?=[«\"—А-ЯЁA-Z])")
-ALLOWED_POS = {"NOUN", "VERB", "INFN", "ADJF", "ADJS", "ADVB", "PRTF", "PRTS", "GRND"}
-PROPER = {"Name", "Surn", "Patr", "Geox", "Orgn", "Abbr", "Init"}
-KEEP_CAPITALIZED = {"бог"}  # «Бог» переводим (Dios), остальные имена оставляем
-STOP_LEMMAS = {"быть", "стать", "мочь", "являться", "есть", "этот", "весь", "свой", "самый"}
-MIN_ZIPF = 3.0  # реже ~1 раза на миллион слов — не «полезное» слово
-MIN_LEN = 3
+SENT_RE = re.compile(r"(?<=[.!?…])[»\"\)]*\s+(?=[«\"—А-ЯЁA-Z])")
 
 
 @lru_cache(maxsize=1)
@@ -27,23 +20,41 @@ def _morph() -> pymorphy3.MorphAnalyzer:
 
 
 def judge(word: str, first_in_sentence: bool):
-    """Возвращает (lemma, zipf) если слово подходит для изучения, иначе None."""
-    if len(word) < MIN_LEN or "-" in word:
+    """Любое обычное русское слово интерактивно.
+    
+    Возвращает (lemma, sent_position) если word - это обычное русское слово,
+    иначе None.
+    
+    Исключаются только:
+    - аббревиатуры (все заглавные).
+    
+    Включаются:
+    - все части речи (существительные, глаголы, прилагательные, предлоги, местоимения, наречия и т.д.);
+    - служебные слова (в, на, по, за, кто, что, он, они и т.д.);
+    - короткие слова (я, в, с, к, и и т.д.);
+    - частые слова;
+    - редкие слова;
+    - имена собственные (Иегова, Иисус, Иерусалим);
+    - все формы глаголов.
+    """
+    if not word or len(word) < 1:
         return None
-    if len(word) > 1 and word.isupper():  # аббревиатура
+    
+    # Исключить аббревиатуры (ВСЕ ЗАГЛАВНЫЕ, более одного символа)
+    if len(word) > 1 and word.isupper():
         return None
-    cap = word[0].isupper()
+    
+    # Получить лемму для контекста
     parses = _morph().parse(word.lower())
+    if not parses:
+        return None
+    
     best = parses[0]
     lemma = best.normal_form
-    if cap and not first_in_sentence and lemma not in KEEP_CAPITALIZED:
-        return None  # имя собственное / название
-    if cap and first_in_sentence and any(p.score >= 0.2 and PROPER & set(p.tag.grammemes) for p in parses):
-        return None
-    if best.tag.POS not in ALLOWED_POS or lemma in STOP_LEMMAS:
-        return None
-    z = zipf_frequency(lemma, "ru")
-    return (lemma, z) if z >= MIN_ZIPF else None
+    
+    # Это обычное русское слово? Если да, оно интерактивно.
+    # Больше не фильтруем по части речи, длине, частотности.
+    return (lemma, 0)  # второе значение больше не используется, но сохранено для совместимости
 
 
 class _Ctx:
@@ -73,7 +84,7 @@ def _merge(nodes):
 
 
 def analyze_blocks(blocks: list[dict], start_id: int = 0):
-    """-> (новые блоки, meta {id: {w, lemma, zipf, sent}}, next_id)"""
+    """-> (новые блоки, meta {id: {w, lemma, sent}}, next_id)"""
     meta: dict[int, dict] = {}
     nid = start_id
     out_blocks = []
@@ -98,7 +109,7 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0):
                         if m.start() > last:
                             res.append({"t": "text", "s": s[last:m.start()]})
                         res.append({"t": "w", "id": nid, "s": m.group()})
-                        meta[nid] = {"w": m.group(), "lemma": j[0], "zipf": j[1], "sent": sent}
+                        meta[nid] = {"w": m.group(), "lemma": j[0], "sent": sent}
                         nid += 1
                         last = m.end()
                 if last < len(s):
@@ -111,5 +122,5 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0):
 
 
 def priority_order(meta: dict[int, dict]) -> list[int]:
-    """Сначала частотные (полезные) слова; при равенстве — по порядку в тексте."""
-    return sorted(meta, key=lambda i: (-round(meta[i]["zipf"], 1), i))
+    """Возвращает все слова в порядке появления."""
+    return sorted(meta.keys())
