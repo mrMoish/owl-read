@@ -45,7 +45,7 @@ function Node({ node, index, translations, onWordClick, meta }) {
   return <>{children}</>;
 }
 
-export default function RichText({ nodes = [], translations = {}, onWordClick, meta = {} }) {
+export default function RichText({ nodes = [], translations = {}, onWordClick = () => {}, meta = {} }) {
   return nodes.map((node, index) => (
     <Node key={`${index}-${node.t}`} node={node} index={index} translations={translations} onWordClick={onWordClick} meta={meta} />
   ));
