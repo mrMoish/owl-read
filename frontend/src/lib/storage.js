@@ -12,6 +12,23 @@ export const saveTranslations = (date, data) => safe(() => {
   localStorage.setItem(P, JSON.stringify(raw));
 });
 
+/** Выравнивания предложений и активные юниты — отдельно от простых переводов. */
+const ALIGN = "reader.align.v1";
+
+export const loadAlignState = (date) => safe(() => {
+  const raw = JSON.parse(localStorage.getItem(ALIGN) || "{}");
+  const d = raw[date];
+  return d && typeof d === "object"
+    ? { alignments: d.alignments || {}, active: Array.isArray(d.active) ? d.active : [] }
+    : { alignments: {}, active: [] };
+}, { alignments: {}, active: [] });
+
+export const saveAlignState = (date, alignments = {}, active = new Set()) => safe(() => {
+  const raw = JSON.parse(localStorage.getItem(ALIGN) || "{}");
+  raw[date] = { alignments, active: [...active] };
+  localStorage.setItem(ALIGN, JSON.stringify(raw));
+});
+
 export const localDate = (now = new Date()) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;

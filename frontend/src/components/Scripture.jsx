@@ -1,11 +1,11 @@
 import React from "react";
 import RichText from "./RichText.jsx";
 
-export default function Scripture({ block, translations = {}, onWordClick = () => {}, meta = {} }) {
+export default function Scripture({ block, translations = {}, onWordClick = () => {}, meta = {}, alignOf = null, activeUnits }) {
   return (
     <blockquote className="verse">
       <p>
-        <RichText nodes={block.nodes} translations={translations} onWordClick={onWordClick} meta={meta} />
+        <RichText nodes={block.nodes} translations={translations} onWordClick={onWordClick} meta={meta} alignOf={alignOf} activeUnits={activeUnits} />
       </p>
     </blockquote>
   );

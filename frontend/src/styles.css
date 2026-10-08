@@ -24,9 +24,12 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 }
 .page a { color: inherit; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
 
-/* Interactive words: completely invisible UI, only behavioral interactivity */
+/* Interactive words: completely invisible UI, only behavioral interactivity.
+   inline-block нужен для FLIP-пермещений (transform) и схлопывания спутников;
+   переносы наследуются (hyphens) и на отдельных словах не меняются. */
 .word {
-  display: inline;
+  display: inline-block;
+  max-width: 100%;
   padding: 0;
   margin: 0;
   border: none;
@@ -62,6 +65,19 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   /* No visual change. Same as untranslated. */
 }
 
+/* Испанское слово активного юнита: короткое мягкое проявление при замене русского. */
+.word.es { animation: es-in .22s ease-out; }
+
+/* Спутник — русское слово без своего испанского эквивалента, поглощённое
+   переводом соседа: плавно тает и схлопывается. */
+.word.sat {
+  max-width: 6em;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width .3s ease-in .08s, opacity .3s ease-in .08s;
+}
+.word.sat--faded { max-width: 0; opacity: 0; }
+
 .es { color: var(--accent); font-weight: 600; font-style: normal; }
 .source { margin-top: 2rem; color: var(--muted); font-size: 0.9rem; }
 .notice { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
@@ -87,4 +103,10 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 .panel input { width: 100%; accent-color: var(--accent); margin: 0; height: 28px; }
 .panel small { display: block; margin-top: .5rem; color: var(--muted); }
 @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
-@media (prefers-reduced-motion: reduce) { .panel { animation: none; } .fab { transition: none; } }
+@keyframes es-in { from { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) {
+  .panel { animation: none; }
+  .fab { transition: none; }
+  .word.es { animation: none; }
+  .word.sat, .word.sat--faded { transition: none; }
+}

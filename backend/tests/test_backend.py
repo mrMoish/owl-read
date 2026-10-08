@@ -34,11 +34,10 @@ def test_analyzer_filters_and_orders():
     r = parse_wol_page(PAGE, date(2026, 10, 6))
     blocks, meta, _ = analyze_blocks([r["verse"], *r["comment"]])
     words = {m["w"] for m in meta.values()}
-    assert "Иегова" not in words and "Иудее" not in words and "Христианам" in words
-    assert "любовь" in words and "люди" in words
+    # любое обычное русское слово интерактивно, включая имена и топонимы
+    assert "Христианам" in words and "Иудее" in words
     order = priority_order(meta)
-    z = [round(meta[i]["zipf"], 1) for i in order]
-    assert z == sorted(z, reverse=True)
+    assert order == sorted(order)
     # текст не повреждён
     def flat(ns): return "".join(n["s"] if n["t"] in ("text", "w") else flat(n["c"]) for n in ns)
     assert flat(blocks[1]["nodes"]) == flat(r["comment"][0]["nodes"])
@@ -67,7 +66,7 @@ def test_daily_cache_new_day_and_stale(tmp_path, monkeypatch):
     today = datetime.now(timezone.utc).date()
     d1, d2 = today.isoformat(), (today + timedelta(days=1)).isoformat()
     a = c.get(f"/api/daily?date={d1}").json(); assert a["date"] == d1 and calls["wol"] == 1
-    assert a["translations_status"] == "unavailable"
+    assert a["translations_status"] == "ready"
     c.get(f"/api/daily?date={d1}"); assert calls["wol"] == 1          # тот же день: кэш
     b = c.get(f"/api/daily?date={d2}").json(); assert b["date"] == d2 and calls["wol"] == 2  # новый день
     # WOL упал в третий день -> последний сохранённый + уведомление
@@ -80,29 +79,3 @@ def test_daily_cache_new_day_and_stale(tmp_path, monkeypatch):
     assert r["notice"] is None
     r = TestClient(app2).get(f"/api/daily?date={(today - timedelta(days=1)).isoformat()}").json()
     assert r["notice"] and r["date"] == d2
-
-def test_translations_cached(tmp_path):
-    app, calls = make_app(tmp_path, pages=page_for)
-    n = {"llm": 0}
-    def handler(request):
-        n["llm"] += 1
-        items = json.loads(json.loads(request.content)["messages"][1]["content"])["items"]
-        rows = [{"id": i["id"], "es": "amor" if i["word"] == "любовь" else "palabra"} for i in items]
-        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
-    import app.translation.openrouter as o
-    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    orig = o.OpenRouterClient.__init__
-    def init(self, k, m, h=None): orig(self, k, m, http)
-    o.OpenRouterClient.__init__ = init
-    try:
-        app, calls = make_app(tmp_path, pages=page_for)
-        c = TestClient(app)
-        d = datetime.now(timezone.utc).date().isoformat()
-        r = c.post(f"/api/daily/translations?date={d}").json()
-        assert r["translations_status"] == "ready" and "amor" in r["translations"].values() and n["llm"] >= 1
-        before = n["llm"]
-        c.post(f"/api/daily/translations?date={d}")
-        assert n["llm"] == before                                     # кэш: повторных запросов нет
-        g = c.get(f"/api/daily?date={d}").json(); assert g["translations_status"] == "ready"
-    finally:
-        o.OpenRouterClient.__init__ = orig

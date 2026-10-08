@@ -4,3 +4,8 @@ __pycache__/
 .pytest_cache/
 node_modules/
 dist/
+# macOS
+.DS_Store
+
+# JetBrains / PyCharm
+.idea/

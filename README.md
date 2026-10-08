@@ -33,12 +33,28 @@ PWA устанавливается только по HTTPS (или на localhos
 backend/app/
   wol/fetcher.py        скачивание страницы WOL (.../lp-u/ГГГГ/М/Д)
   wol/parser.py         ЕДИНСТВЕННОЕ место, знающее про HTML WOL → нейтральные блоки
-  textproc/analyzer.py  токенизация, pymorphy3 (леммы, имена), wordfreq (частотность), предложения
-  translation/openrouter.py  клиент, JSON-ответ, валидация, ретраи
-  translation/service.py     выбор слов, кэш (слово+предложение+es-AR), батчи по 40
-  store.py              SQLite: daily(date) и translations(key)
+  textproc/analyzer.py  токенизация, pymorphy3 (леммы), предложения
+  translation/openrouter.py  клиент, JSON-ответ, валидация, ретраи; перевод слова
+                             и выравнивание предложения (ALIGN_SYSTEM)
+  translation/alignment.py   модель соответствий: юниты «набор русских слов ↔
+                             диапазон испанских слов», валидация ответа модели
+  translation/service.py     кэш переводов (слово+предложение) и выравниваний
+                             (предложение), деградация к простому переводу
+  store.py              SQLite: daily(date), daily_es(date), translations(key), alignments(key)
   daily.py              логика «новый день → новый запрос к WOL», откат на сохранённое
-  main.py               GET /api/daily, POST /api/daily/translations, раздача frontend/dist
-frontend/src/  App, useDaily, components/{Scripture,Comment,RichText,SettingsFab}, lib/{selection,storage}
+  main.py               GET /api/daily, POST /api/translate, раздача frontend/dist
+frontend/src/
+  App.jsx               клики, состояние выравниваний, вибрация «нет перевода», FLIP
+  components/RichText.jsx  группы выравнивания: испанский порядок, вставки, спутники
+  lib/alignment.js      нормализация выравнивания, layout групп, классификация клика
+  lib/{selection,storage}
 frontend/public/  manifest.webmanifest, sw.js, offline.html, icons/
 ```
+
+### Модель соответствий (alignment)
+`POST /api/translate` с `ru_words` + `clicked_index` возвращает, кроме строки-перевода,
+`alignment`: `ru_words` ↔ `es_words` + юниты `{"ru": [индексы], "es": [start, end], "head": i}`.
+Юнит покрывает word→word, word→phrase, phrase→word, phrase→phrase и несплошные
+наборы («за + наблюдал → observaba»); испанские слова вне юнитов — вставки
+(«por la»), русские вне юнитов — слова без отдельного перевода (клик = вибрация).
+Без `ru_words` эндпоинт работает по-старому (простая строка).

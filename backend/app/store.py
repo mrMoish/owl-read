@@ -20,7 +20,9 @@ class Store:
                    CREATE TABLE IF NOT EXISTS daily_es(
                      date TEXT PRIMARY KEY, content TEXT NOT NULL, fetched_at REAL NOT NULL);
                    CREATE TABLE IF NOT EXISTS translations(
-                     key TEXT PRIMARY KEY, es TEXT NOT NULL, created_at REAL NOT NULL);"""
+                     key TEXT PRIMARY KEY, es TEXT NOT NULL, created_at REAL NOT NULL);
+                   CREATE TABLE IF NOT EXISTS alignments(
+                     key TEXT PRIMARY KEY, data TEXT NOT NULL, created_at REAL NOT NULL);"""
             )
 
     def _table(self, lang: str = "ru"):
@@ -58,3 +60,13 @@ class Store:
         with self._lock, self._db:
             self._db.executemany("INSERT OR REPLACE INTO translations VALUES(?,?,?)",
                                  [(k, v, time.time()) for k, v in items.items()])
+
+    def get_alignment(self, key: str) -> dict | None:
+        with self._lock:
+            r = self._db.execute("SELECT data FROM alignments WHERE key=?", (key,)).fetchone()
+        return json.loads(r[0]) if r else None
+
+    def put_alignment(self, key: str, alignment: dict) -> None:
+        with self._lock, self._db:
+            self._db.execute("INSERT OR REPLACE INTO alignments VALUES(?,?,?)",
+                             (key, json.dumps(alignment, ensure_ascii=False), time.time()))

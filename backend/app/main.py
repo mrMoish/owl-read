@@ -48,6 +48,15 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None)
         sentence = str(payload.get("sentence", "")).strip()
         context = str(payload.get("context", sentence)).strip()
         date = str(payload.get("date") or "").strip()
+        ru_words = payload.get("ru_words")
+        if isinstance(ru_words, list):
+            ru_words = [str(w) for w in ru_words][:120] or None
+        else:
+            ru_words = None
+        try:
+            clicked_index = int(payload.get("clicked_index"))
+        except (TypeError, ValueError):
+            clicked_index = None
         if not word or not sentence:
             raise HTTPException(400, "word и sentence обязательны")
         try:
@@ -60,15 +69,20 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None)
             spanish_reference = _flatten_daily_text(spanish_content)
         except WolError:
             spanish_reference = ""
-        translated = await tr.translate_word(
+        result = await tr.translate_word(
             date=date or content["date"],
             word=word,
             lemma=lemma,
             sentence=sentence,
             context=context,
             spanish_reference=spanish_reference,
+            ru_words=ru_words,
+            clicked_index=clicked_index,
         )
-        return {"original": word, "translation": translated}
+        out = {"original": word, "translation": result["translation"]}
+        if result["alignment"]:
+            out["alignment"] = result["alignment"]
+        return out
 
     if s.frontend_dist.exists():
         app.mount("/", StaticFiles(directory=s.frontend_dist, html=True), name="web")

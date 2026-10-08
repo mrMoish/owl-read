@@ -2,6 +2,7 @@
 from __future__ import annotations
 import hashlib
 import logging
+from .alignment import derive_translation, normalize_alignment
 from .openrouter import OpenRouterClient, TranslationError
 
 log = logging.getLogger("uvicorn.error")
@@ -19,6 +20,11 @@ def cache_key(*parts):
         date, word, sentence = parts
     text = f"v2|{date}|{LANG}|{word.lower()}|{sentence}"
     return hashlib.sha1(text.encode("utf-8")).hexdigest()
+
+
+def alignment_cache_key(date: str, sentence: str) -> str:
+    """Кэш выравнивания — на предложение, а не на слово."""
+    return hashlib.sha1(f"align|v1|{date}|{LANG}|{sentence}".encode("utf-8")).hexdigest()
 
 
 class TranslationService:
@@ -50,23 +56,56 @@ class TranslationService:
             return tr, "unavailable"
         return tr, "ready"
 
-    async def translate_word(self, *, date: str, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None):
+    async def translate_word(self, *, date: str, word: str, lemma: str, sentence: str, context: str,
+                             spanish_reference: str | None = None,
+                             ru_words: list[str] | None = None, clicked_index: int | None = None) -> dict:
+        """-> {"translation": str|None, "alignment": dict|None}.
+        translation=None значит: у нажатого слова нет отдельного перевода в контексте.
+        alignment отсутствует, если модель не дала пригодного выравнивания —
+        тогда caller деградирует к простому переводу-строке."""
         if not word or not sentence:
-            return word
+            return {"translation": word, "alignment": None}
+        use_align = (isinstance(ru_words, list) and 0 < len(ru_words) <= 120
+                     and clicked_index is not None and 0 <= clicked_index < len(ru_words))
+        if use_align:
+            akey = alignment_cache_key(date, sentence)
+            cached_align = self.store.get_alignment(akey)
+            if cached_align:
+                return {"translation": derive_translation(cached_align, clicked_index),
+                        "alignment": cached_align}
+        if not self.client:
+            return {"translation": word, "alignment": None}
+        if use_align:
+            try:
+                raw = await self.client.translate_aligned(
+                    ru_words=ru_words, clicked_index=clicked_index,
+                    sentence=sentence, context=context, spanish_reference=spanish_reference)
+            except TranslationError as e:
+                log.warning("translate_aligned failed: %s", e)
+                return {"translation": await self._plain_translation(date, word, lemma, sentence, context, spanish_reference), "alignment": None}
+            alignment = normalize_alignment(ru_words, raw)
+            if alignment:
+                self.store.put_alignment(akey, alignment)
+                return {"translation": derive_translation(alignment, clicked_index), "alignment": alignment}
+            # выравнивание не прошло проверку — деградируем к строке, если модель её дала
+            tr = raw.get("translation") if isinstance(raw, dict) else None
+            if tr and tr != word and tr != lemma:
+                self.store.put_translations({cache_key(date, word, sentence): tr})
+                return {"translation": tr, "alignment": None}
+            return {"translation": await self._plain_translation(date, word, lemma, sentence, context, spanish_reference), "alignment": None}
+        return {"translation": await self._plain_translation(date, word, lemma, sentence, context, spanish_reference), "alignment": None}
+
+    async def _plain_translation(self, date: str, word: str, lemma: str, sentence: str,
+                                 context: str, spanish_reference: str | None) -> str:
+        """Прежний путь: перевод одним словом/фразой без выравнивания."""
         key = cache_key(date, word, sentence)
         previous = self.store.get_translations([key])
         if key in previous:
             return previous[key]
-        if not self.client:
-            return word
         try:
             tr = await self.client.translate_word(
-                word=word,
-                lemma=lemma,
-                sentence=sentence,
-                context=context,
-                spanish_reference=spanish_reference,
-            )
+                word=word, lemma=lemma, sentence=sentence, context=context,
+                spanish_reference=spanish_reference)
         except TranslationError as e:
             log.warning("translate_word failed: %s", e)
             return word
