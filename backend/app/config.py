@@ -15,7 +15,8 @@ class Settings:
     db_path: Path
     timezone: str
     wol_base_url: str
-    translate_max_share: float  # доля подходящих слов, переводимая заранее (слайдер до 50%)
+    es_wol_base_url: str
+    translate_max_share: float  # legacy, kept for compatibility but no longer used by UX
     frontend_dist: Path
 
 
@@ -26,6 +27,7 @@ def get_settings() -> Settings:
         db_path=Path(os.environ.get("DB_PATH", ROOT / "backend" / "data" / "app.sqlite3")),
         timezone=os.environ.get("APP_TIMEZONE", "America/Argentina/Buenos_Aires"),
         wol_base_url=os.environ.get("WOL_BASE_URL", "https://wol.jw.org/ru/wol/h/r2/lp-u"),
+        es_wol_base_url=os.environ.get("WOL_ES_BASE_URL", "https://wol.jw.org/es/wol/h/r4/lp-s"),
         translate_max_share=0.5,
         frontend_dist=ROOT / "frontend" / "dist",
     )

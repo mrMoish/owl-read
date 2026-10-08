@@ -16,7 +16,16 @@ SYSTEM = (
     "gender, case function) so the sentence stays correct. Choose the sense that fits the sentence "
     "(e.g. «мир» = paz or mundo). Use natural, neutral Argentine Spanish: no heavy slang, no Spain-only "
     "forms (no 'vosotros'). Keep the first letter capitalised if the source word is. "
+    "Use the provided Russian sentence and the Spanish WOL reference context to choose the most natural term "
+    "used in official JW Spanish material when relevant. "
     'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
+)
+SINGLE_SYSTEM = (
+    "Translate one Russian word in context into natural Argentine Spanish (es-AR). "
+    "Use the Russian sentence and Spanish WOL reference context to choose the best fit. "
+    "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.0-1.0}. "
+    "Do not translate isolated words without context. If the word is a proper name or a non-translatable token, "
+    "return the original word only when necessary."
 )
 
 
@@ -42,9 +51,72 @@ def parse_response(text: str, allowed_ids: set[int]) -> dict[int, str]:
     return out
 
 
+def parse_single_response(text: str) -> str:
+    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+    try:
+        data = json.loads(text)
+        tr = data.get("translation") if isinstance(data, dict) else None
+        if not isinstance(tr, str):
+            raise TranslationError("translation field missing")
+        tr = tr.strip()
+        if not tr or len(tr) > 60 or CYR.search(tr):
+            raise TranslationError("translation invalid")
+        return tr
+    except (ValueError, TypeError, KeyError) as e:
+        raise TranslationError(f"Некорректный JSON от модели: {e}") from e
+
+
 class OpenRouterClient:
     def __init__(self, api_key: str, model: str, http: httpx.AsyncClient | None = None):
         self.api_key, self.model, self._http = api_key, model, http
+
+    async def translate_word(self, *, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None) -> str:
+        """Перевод одного слова в контексте. Возвращает испанское слово или пустую строку при ошибке."""
+        payload = {
+            "word": word,
+            "lemma": lemma,
+            "sentence": sentence,
+            "context": context,
+            "spanish_reference": spanish_reference or "",
+        }
+        body = {
+            "model": self.model,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": SINGLE_SYSTEM},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "X-Title": "Daily Reader"}
+        own = self._http is None
+        http = self._http or httpx.AsyncClient(timeout=60)
+        last: Exception | None = None
+        try:
+            for attempt in range(3):
+                try:
+                    r = await http.post(URL, json=body, headers=headers)
+                    if r.status_code == 400 and "response_format" in body:
+                        body.pop("response_format")
+                        log.warning("400 от OpenRouter, повторяю без response_format")
+                        continue
+                    if r.status_code in (401, 402, 403):
+                        raise TranslationError(f"OpenRouter {r.status_code}: {r.text[:200]}")
+                    if r.status_code in (429, 500, 502, 503, 504):
+                        raise TranslationError(f"OpenRouter {r.status_code}")
+                    r.raise_for_status()
+                    content = r.json()["choices"][0]["message"]["content"]
+                    return parse_single_response(content)
+                except (httpx.HTTPError, TranslationError, KeyError, IndexError, ValueError) as e:
+                    last = e
+                    log.warning("OpenRouter single-word попытка %s не удалась: %s", attempt + 1, e)
+                    if isinstance(e, TranslationError) and "OpenRouter 40" in str(e):
+                        break
+                    await asyncio.sleep(0.8 * (attempt + 1))
+        finally:
+            if own:
+                await http.aclose()
+        raise TranslationError(f"OpenRouter недоступен: {last}")
 
     async def translate_batch(self, items: list[dict]) -> dict[int, str]:
         """items: [{id, word, lemma, sentence}] -> {id: es}. Слова без перевода просто отсутствуют."""
@@ -63,10 +135,10 @@ class OpenRouterClient:
                 try:
                     r = await http.post(URL, json=body, headers=headers)
                     if r.status_code == 400 and "response_format" in body:
-                        body.pop("response_format")  # модель не поддерживает JSON-режим
+                        body.pop("response_format")
                         log.warning("400 от OpenRouter, повторяю без response_format")
                         continue
-                    if r.status_code in (401, 402, 403):  # ключ/лимит: повторять бессмысленно
+                    if r.status_code in (401, 402, 403):
                         raise TranslationError(f"OpenRouter {r.status_code}: {r.text[:200]}")
                     if r.status_code in (429, 500, 502, 503, 504):
                         raise TranslationError(f"OpenRouter {r.status_code}")

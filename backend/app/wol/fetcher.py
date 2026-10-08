@@ -11,11 +11,12 @@ class WolError(Exception):
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; DailyReader/1.0)", "Accept-Language": "ru"}
 
 
-async def fetch_wol_page(base_url: str, day: date, client: httpx.AsyncClient | None = None) -> str:
-    # Страница конкретной даты: .../lp-u/2026/10/6 (формат из навигации самого WOL)
+async def fetch_wol_page(base_url: str, day: date, client: httpx.AsyncClient | None = None, language: str = "ru") -> str:
+    """Страница конкретной даты: .../lp-u/2026/10/6 (формат из навигации самого WOL)."""
     url = f"{base_url}/{day.year}/{day.month}/{day.day}"
     own = client is None
-    client = client or httpx.AsyncClient(timeout=15, follow_redirects=True, headers=HEADERS)
+    headers = {**HEADERS, "Accept-Language": language}
+    client = client or httpx.AsyncClient(timeout=15, follow_redirects=True, headers=headers)
     try:
         r = await client.get(url)
         r.raise_for_status()

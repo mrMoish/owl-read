@@ -1,10 +1,21 @@
-const P = "reader.percent", C = "reader.daily";
+const P = "reader.translations";
 const safe = (f, d) => { try { return f(); } catch { return d; } };
-export const loadPercent = () => safe(() => Math.min(50, Math.max(0, Number(localStorage.getItem(P)) || 0)), 0);
-export const savePercent = (v) => safe(() => localStorage.setItem(P, String(v)));
-export const loadDaily = () => safe(() => JSON.parse(localStorage.getItem(C)), null);
-export const saveDaily = (d) => safe(() => localStorage.setItem(C, JSON.stringify(d)));
-export function localDate(now = new Date()) {
+
+export const loadTranslations = (date) => safe(() => {
+  const raw = JSON.parse(localStorage.getItem(P) || "{}");
+  return raw[date] || {};
+}, {});
+
+export const saveTranslations = (date, data) => safe(() => {
+  const raw = JSON.parse(localStorage.getItem(P) || "{}");
+  raw[date] = data;
+  localStorage.setItem(P, JSON.stringify(raw));
+});
+
+export const localDate = (now = new Date()) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
-}
+};
+
+export const loadDaily = () => safe(() => JSON.parse(localStorage.getItem("reader.daily") || "null"), null);
+export const saveDaily = (d) => safe(() => localStorage.setItem("reader.daily", JSON.stringify(d)));

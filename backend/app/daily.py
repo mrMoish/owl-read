@@ -9,8 +9,9 @@ from .wol.parser import parse_wol_page
 
 
 class DailyService:
-    def __init__(self, settings, store, translator, fetch=fetch_wol_page):
+    def __init__(self, settings, store, translator, fetch=fetch_wol_page, fetch_spanish=None):
         self.s, self.store, self.tr, self.fetch = settings, store, translator, fetch
+        self.fetch_spanish = fetch_spanish or (lambda base, day, client=None: fetch_wol_page(base, day, client=client, language="es"))
         self._locks: dict[str, asyncio.Lock] = {}
 
     def resolve_date(self, client_date: str | None) -> date:
@@ -25,28 +26,36 @@ class DailyService:
                 pass
         return server
 
-    async def get(self, client_date: str | None = None):
-        """-> (content, stale_notice|None)"""
-        day = self.resolve_date(client_date)
+    async def _get_by_lang(self, day: date, fetch_fn, base_url: str, lang: str):
         key = day.isoformat()
-        saved = self.store.get_daily(key)
-        if saved:  # тот же день: без обращения к WOL
+        saved = self.store.get_daily(key, lang=lang)
+        if saved:
             return saved, None
-        lock = self._locks.setdefault(key, asyncio.Lock())
+        lock = self._locks.setdefault(f"{lang}:{key}", asyncio.Lock())
         async with lock:
-            saved = self.store.get_daily(key)
+            saved = self.store.get_daily(key, lang=lang)
             if saved:
                 return saved, None
             try:
-                html = await self.fetch(self.s.wol_base_url, day)
+                html = await fetch_fn(base_url, day)
                 content = self.build(parse_wol_page(html, day), key)
             except WolError as e:
-                last = self.store.latest_daily()
+                last = self.store.latest_daily(lang=lang)
                 if last:
                     return last, f"Не удалось обновить материал ({e}). Показан сохранённый выпуск за {last['date']}."
                 raise
-            self.store.put_daily(key, content)
+            self.store.put_daily(key, content, lang=lang)
             return content, None
+
+    async def get(self, client_date: str | None = None):
+        """-> (content, stale_notice|None) for Russian WOL."""
+        day = self.resolve_date(client_date)
+        return await self._get_by_lang(day, self.fetch, self.s.wol_base_url, "ru")
+
+    async def get_spanish(self, client_date: str | None = None):
+        """-> (content, stale_notice|None) for Spanish WOL."""
+        day = self.resolve_date(client_date)
+        return await self._get_by_lang(day, self.fetch_spanish, self.s.es_wol_base_url, "es")
 
     @staticmethod
     def build(parsed: dict, key: str) -> dict:

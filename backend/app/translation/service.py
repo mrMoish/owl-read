@@ -1,9 +1,7 @@
 """Выбор слов, кэш (слово + предложение + язык), батчи в OpenRouter."""
 from __future__ import annotations
-import asyncio
 import hashlib
 import logging
-import math
 from .openrouter import OpenRouterClient, TranslationError
 
 log = logging.getLogger("uvicorn.error")
@@ -11,8 +9,16 @@ LANG = "es-AR"
 CHUNK = 40
 
 
-def cache_key(word: str, sentence: str) -> str:
-    return hashlib.sha1(f"v1|{LANG}|{word.lower()}|{sentence}".encode()).hexdigest()
+def cache_key(*parts):
+    """Составной cache key: current date + word + sentence + language.
+    Поддерживает старый вызов cache_key(word, sentence) для совместимости."""
+    if len(parts) == 2:
+        word, sentence = parts
+        date = ""
+    else:
+        date, word, sentence = parts
+    text = f"v2|{date}|{LANG}|{word.lower()}|{sentence}"
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()
 
 
 class TranslationService:
@@ -20,12 +26,12 @@ class TranslationService:
         self.store, self.client, self.max_share = store, client, max_share
 
     def _needed(self, content: dict) -> list[int]:
-        order = content["order"]
-        return order[: math.ceil(len(order) * self.max_share)]
+        # Legacy auto-translation path is disabled; this method is kept for compatibility.
+        return []
 
     def _lookup(self, content: dict):
         ids = self._needed(content)
-        keys = {i: cache_key(content["meta"][str(i)]["w"], content["meta"][str(i)]["sent"]) for i in ids}
+        keys = {i: cache_key(content["date"], content["meta"][str(i)]["w"], content["meta"][str(i)]["sent"]) for i in ids}
         hit = self.store.get_translations(list(keys.values()))
         return ids, keys, {i: hit[k] for i, k in keys.items() if k in hit}
 
@@ -42,26 +48,29 @@ class TranslationService:
             return tr, "ready"
         if not self.client:
             return tr, "unavailable"
-        sem = asyncio.Semaphore(3)
+        return tr, "ready"
 
-        async def run(part):
-            items = [{"id": i, "word": content["meta"][str(i)]["w"],
-                      "lemma": content["meta"][str(i)]["lemma"],
-                      "sentence": content["meta"][str(i)]["sent"]} for i in part]
-            async with sem:
-                return await self.client.translate_batch(items)
-
-        parts = [missing[i:i + CHUNK] for i in range(0, len(missing), CHUNK)]
-        results = await asyncio.gather(*(run(p) for p in parts), return_exceptions=True)
-        new = {}
-        for r in results:
-            if isinstance(r, TranslationError):
-                log.warning("Батч перевода не удался: %s", r)
-            if isinstance(r, dict):
-                new.update(r)
-            elif not isinstance(r, TranslationError):
-                raise r
-        if new:
-            self.store.put_translations({keys[i]: es for i, es in new.items()})
-            tr.update(new)
-        return tr, ("ready" if len(tr) == len(ids) else "partial")
+    async def translate_word(self, *, date: str, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None):
+        if not word or not sentence:
+            return word
+        key = cache_key(date, word, sentence)
+        previous = self.store.get_translations([key])
+        if key in previous:
+            return previous[key]
+        if not self.client:
+            return word
+        try:
+            tr = await self.client.translate_word(
+                word=word,
+                lemma=lemma,
+                sentence=sentence,
+                context=context,
+                spanish_reference=spanish_reference,
+            )
+        except TranslationError as e:
+            log.warning("translate_word failed: %s", e)
+            return word
+        if not tr or tr == word or tr == lemma:
+            return word
+        self.store.put_translations({key: tr})
+        return tr

@@ -17,23 +17,31 @@ class Store:
             self._db.executescript(
                 """CREATE TABLE IF NOT EXISTS daily(
                      date TEXT PRIMARY KEY, content TEXT NOT NULL, fetched_at REAL NOT NULL);
+                   CREATE TABLE IF NOT EXISTS daily_es(
+                     date TEXT PRIMARY KEY, content TEXT NOT NULL, fetched_at REAL NOT NULL);
                    CREATE TABLE IF NOT EXISTS translations(
                      key TEXT PRIMARY KEY, es TEXT NOT NULL, created_at REAL NOT NULL);"""
             )
 
-    def get_daily(self, date: str):
+    def _table(self, lang: str = "ru"):
+        return "daily" if lang == "ru" else "daily_es"
+
+    def get_daily(self, date: str, lang: str = "ru"):
+        table = self._table(lang)
         with self._lock:
-            r = self._db.execute("SELECT content FROM daily WHERE date=?", (date,)).fetchone()
+            r = self._db.execute(f"SELECT content FROM {table} WHERE date=?", (date,)).fetchone()
         return json.loads(r[0]) if r else None
 
-    def latest_daily(self):
+    def latest_daily(self, lang: str = "ru"):
+        table = self._table(lang)
         with self._lock:
-            r = self._db.execute("SELECT content FROM daily ORDER BY date DESC LIMIT 1").fetchone()
+            r = self._db.execute(f"SELECT content FROM {table} ORDER BY date DESC LIMIT 1").fetchone()
         return json.loads(r[0]) if r else None
 
-    def put_daily(self, date: str, content: dict) -> None:
+    def put_daily(self, date: str, content: dict, lang: str = "ru") -> None:
+        table = self._table(lang)
         with self._lock, self._db:
-            self._db.execute("INSERT OR REPLACE INTO daily VALUES(?,?,?)",
+            self._db.execute(f"INSERT OR REPLACE INTO {table} VALUES(?,?,?)",
                              (date, json.dumps(content, ensure_ascii=False), time.time()))
 
     def get_translations(self, keys):
