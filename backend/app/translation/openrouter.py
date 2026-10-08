@@ -21,11 +21,16 @@ SYSTEM = (
     'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
 )
 SINGLE_SYSTEM = (
-    "Translate one Russian word in context into natural Argentine Spanish (es-AR). "
-    "Use the Russian sentence and Spanish WOL reference context to choose the best fit. "
+    "Translate the exact clicked Russian word only, not the surrounding words. "
+    "Use the Russian sentence and Spanish WOL reference context to disambiguate the meaning. "
+    "If the clicked word is a single word token, return a single-word Spanish translation if possible. "
+    "Do not translate a full phrase or a full name when the user clicked only one word. "
+    "Do not echo neighboring words; do not output a phrase if the source is one word. "
+    "Keep the answer natural Argentine Spanish (es-AR), neutral, not slang-heavy. "
+    "If the clicked word is a proper name or a person name, return the name form only, not the full phrase. "
+    "Use the exact clicked word's grammatical form and sentence meaning. "
     "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.0-1.0}. "
-    "Do not translate isolated words without context. If the word is a proper name or a non-translatable token, "
-    "return the original word only when necessary."
+    "If the translation is uncertain, return the original word rather than a broader phrase."
 )
 
 
