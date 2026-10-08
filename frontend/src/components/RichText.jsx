@@ -17,10 +17,9 @@ function Node({ node, index, translations, onWordClick, meta }) {
     const translated = translations[id];
     const content = translated || word;
     return (
-      <button
+      <span
         key={index}
-        type="button"
-        className={translated ? "word word--translated" : "word"}
+        className="word"
         onClick={() => onWordClick({
           id: node.id,
           word,
@@ -28,10 +27,24 @@ function Node({ node, index, translations, onWordClick, meta }) {
           sentence: info.sent || "",
           context: "",
         })}
+        role="button"
+        tabIndex="0"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onWordClick({
+              id: node.id,
+              word,
+              lemma: info.lemma || word,
+              sentence: info.sent || "",
+              context: "",
+            });
+          }
+        }}
         aria-label={translated ? `Вернуть слово ${word}` : `Перевести слово ${word}`}
       >
         {content}
-      </button>
+      </span>
     );
   }
 
