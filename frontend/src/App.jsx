@@ -37,14 +37,11 @@ export default function App() {
   const visibleTranslations = useMemo(() => ({ ...baseTranslations, ...manualTranslations }), [baseTranslations, manualTranslations]);
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
-    console.log("[handleWordClick] CLICK", { id, word, sentence, context, lemma, dataDate: data?.date });
     if (!data?.date || !sentence) {
-      console.log("[handleWordClick] Missing data.date or sentence, returning");
       return;
     }
     const key = String(id);
     if (visibleTranslations[key]) {
-      console.log("[handleWordClick] Word already translated, toggling back to Russian");
       setManualTranslations((prev) => {
         const next = { ...prev };
         delete next[key];
@@ -52,7 +49,6 @@ export default function App() {
       });
       return;
     }
-    console.log("[handleWordClick] Starting translation request");
     try {
       const payload = {
         word,
@@ -61,19 +57,14 @@ export default function App() {
         context: context || articleContext(data),
         date: data.date,
       };
-      console.log("[handleWordClick] Payload:", payload);
       const res = await translateWord(payload);
-      console.log("[handleWordClick] Response:", res);
       const translated = res?.translation || res?.original || word;
-      console.log("[handleWordClick] Translated word:", translated);
       if (!translated || translated === word) {
-        console.log("[handleWordClick] Translation is same as original or empty, not updating");
         return;
       }
       setManualTranslations((prev) => ({ ...prev, [key]: translated }));
-      console.log("[handleWordClick] Translation saved");
-    } catch (e) {
-      console.error("[handleWordClick] Error:", e);
+    } catch {
+      // Ошибка перевода не ломает UX.
     }
   };
 
