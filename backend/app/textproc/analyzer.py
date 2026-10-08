@@ -20,41 +20,17 @@ def _morph() -> pymorphy3.MorphAnalyzer:
 
 
 def judge(word: str, first_in_sentence: bool):
-    """Любое обычное русское слово интерактивно.
-    
-    Возвращает (lemma, sent_position) если word - это обычное русское слово,
-    иначе None.
-    
-    Исключаются только:
-    - аббревиатуры (все заглавные).
-    
-    Включаются:
-    - все части речи (существительные, глаголы, прилагательные, предлоги, местоимения, наречия и т.д.);
-    - служебные слова (в, на, по, за, кто, что, он, они и т.д.);
-    - короткие слова (я, в, с, к, и и т.д.);
-    - частые слова;
-    - редкие слова;
-    - имена собственные (Иегова, Иисус, Иерусалим);
-    - все формы глаголов.
-    """
+    """Любое обычное русское слово интерактивно."""
     if not word or len(word) < 1:
         return None
-    
-    # Исключить аббревиатуры (ВСЕ ЗАГЛАВНЫЕ, более одного символа)
     if len(word) > 1 and word.isupper():
         return None
-    
-    # Получить лемму для контекста
     parses = _morph().parse(word.lower())
     if not parses:
         return None
-    
     best = parses[0]
     lemma = best.normal_form
-    
-    # Это обычное русское слово? Если да, оно интерактивно.
-    # Больше не фильтруем по части речи, длине, частотности.
-    return (lemma, 0)  # второе значение больше не используется, но сохранено для совместимости
+    return (lemma, 0)
 
 
 class _Ctx:
@@ -65,8 +41,13 @@ class _Ctx:
         self.ends = self.starts[1:] + [len(plain)]
 
     def sentence(self, off: int):
-        i = bisect.bisect_right(self.starts, off) - 1
-        return self.starts[i], self.plain[self.starts[i]:self.ends[i]].strip()
+        i = max(0, bisect.bisect_right(self.starts, off) - 1)
+        start = self.starts[i]
+        end = self.ends[i]
+        sentence = self.plain[start:end].strip()
+        if not sentence:
+            sentence = self.plain.strip()
+        return start, sentence
 
 
 def _plain(nodes) -> str:
