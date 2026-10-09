@@ -14,8 +14,7 @@ function activeDate() {
 export function useDaily() {
   const [state, setState] = useState(() => {
     const cached = loadDaily();
-    const target = activeDate();
-    return { data: cached?.date === target ? cached : null, loading: true, error: null, notice: null };
+    return { data: cached ?? null, loading: true, error: null, notice: null };
   });
   const busy = useRef(false);
 

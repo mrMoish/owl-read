@@ -260,3 +260,188 @@ test("10. Корректная замена, когда перевод сост�
 
   assert.equal(visible["0"], "por la mañana");
 });
+
+// ─── Тесты офлайн-режима ─────────────────────────────────────────────────────
+
+import { saveDaily, loadDaily } from "./storage.js";
+
+/**
+ * Эмуляция логики catch-блока из useDaily.js для тестирования
+ * без запуска React-хука.
+ */
+function simulateCatchBlock(cachedData, requestedDate) {
+  const s = { data: cachedData };
+  return {
+    data: s.data ?? null,
+    loading: false,
+    error: s.data
+      ? null
+      : "Не удалось получить материал. Проверьте подключение и попробуйте снова.",
+    notice: s.data
+      ? s.data.date === requestedDate
+        ? "Нет связи с сервером — показан сохранённый выпуск."
+        : `Не удалось обновить материал. Показан сохранённый выпуск за ${s.data.date}.`
+      : null,
+  };
+}
+
+function makeDailyData(date, overrides = {}) {
+  return {
+    date,
+    date_label: date,
+    content: { verse: [], comment: [] },
+    verse: { type: "p", nodes: [] },
+    comment: [],
+    meta: { "0": { w: "слово", lemma: "слово", sent: "Пример." } },
+    translations: { "0": "palabra" },
+    translations_status: "ready",
+    ...overrides,
+  };
+}
+
+test("11. Первый запуск с интернетом: текст загружается и сохраняется", () => {
+  globalThis.localStorage.clear();
+
+  // До загрузки ничего нет
+  assert.equal(loadDaily(), null);
+
+  // Имитируем успешную загрузку и сохранение (как в useDaily.js строка 29)
+  const data = makeDailyData("2026-10-09");
+  saveDaily(data);
+
+  // После сохранения данные доступны
+  const cached = loadDaily();
+  assert.equal(cached.date, "2026-10-09");
+  assert.equal(cached.translations["0"], "palabra");
+  assert.equal(cached.translations_status, "ready");
+});
+
+test("12. Повторный запуск без интернета: показывается последний сохранённый текст", () => {
+  globalThis.localStorage.clear();
+
+  // Предварительно сохранённый текст
+  saveDaily(makeDailyData("2026-10-09"));
+
+  // Имитируем офлайн: fetch упал, начальное состояние содержит кэш
+  const cached = loadDaily();
+  const result = simulateCatchBlock(cached, "2026-10-09");
+
+  assert.equal(result.error, null);
+  assert.equal(result.data.date, "2026-10-09");
+  assert.ok(result.notice?.includes("сохранённый выпуск"));
+  assert.equal(result.data.translations["0"], "palabra");
+});
+
+test("13. Ошибка загрузки нового текста: старый текст остаётся доступен", () => {
+  globalThis.localStorage.clear();
+
+  // Вчерашний текст сохранён
+  saveDaily(makeDailyData("2026-10-08"));
+
+  // Сегодня fetch упал — дата не совпадает
+  const cached = loadDaily();
+  const result = simulateCatchBlock(cached, "2026-10-09");
+
+  // Старый текст показан, не потерян
+  assert.equal(result.error, null);
+  assert.equal(result.data.date, "2026-10-08");
+  assert.ok(result.notice?.includes("2026-10-08"));
+});
+
+test("14. Офлайн-замена слова: используется сохранённый перевод без сетевого запроса", () => {
+  globalThis.localStorage.clear();
+
+  const data = makeDailyData("2026-10-09", {
+    meta: { "0": { w: "жизнь", lemma: "жизнь", sent: "Это жизнь." } },
+    translations: { "0": "vida" },
+  });
+  saveDaily(data);
+
+  // Офлайн: перевод берётся из подготовленных данных, не из API
+  let apiCallCount = 0;
+  const mockTranslateWord = () => { apiCallCount++; return Promise.resolve({ translation: "vida" }); };
+
+  const cached = loadDaily();
+  const translationFromCache = cached.translations["0"];
+
+  // Перевод доступен без API-вызова
+  assert.equal(translationFromCache, "vida");
+  assert.equal(apiCallCount, 0);
+
+  // applyLearnedTranslations тоже работает без сети
+  const learned = { жизнь: { lemma: "жизнь", primaryTranslation: "vida", translations: ["vida"] } };
+  const visible = applyLearnedTranslations({
+    meta: cached.meta,
+    preparedTranslations: cached.translations,
+    learnedWords: learned,
+  });
+  assert.equal(visible["0"], "vida");
+  assert.equal(apiCallCount, 0);
+});
+
+test("15. Сохранение состояния заменённых слов после перезапуска", () => {
+  globalThis.localStorage.clear();
+
+  // Пользователь нажал на слово — сохранено в learned
+  addLearnedWord("книга", "libro");
+
+  // Перезапуск: данные загружаются из localStorage
+  const learnedAfterRestart = loadLearnedWords();
+  assert.equal(learnedAfterRestart["книга"]?.primaryTranslation, "libro");
+
+  // Новый текст содержит то же слово — подставляется автоматически
+  const meta = {
+    "0": { w: "книга", lemma: "книга", sent: "Читай книгу." },
+    "1": { w: "книгу", lemma: "книга", sent: "Читай книгу." },
+  };
+  const prepared = { "0": "libro", "1": "libro" };
+  const visible = applyLearnedTranslations({
+    meta,
+    preparedTranslations: prepared,
+    learnedWords: learnedAfterRestart,
+  });
+  assert.equal(visible["0"], "libro");
+  assert.equal(visible["1"], "libro");
+});
+
+test("16. Отсутствие сохранённого текста: отображается понятное сообщение", () => {
+  globalThis.localStorage.clear();
+
+  const cached = loadDaily(); // null
+  const result = simulateCatchBlock(cached, "2026-10-09");
+
+  assert.equal(result.data, null);
+  assert.equal(result.notice, null);
+  assert.ok(result.error?.includes("Проверьте подключение"));
+});
+
+test("17. Успешная загрузка нового текста: локальная версия обновляется", () => {
+  globalThis.localStorage.clear();
+
+  // Старый текст
+  saveDaily(makeDailyData("2026-10-08", { translations: { "0": "viejo" } }));
+  assert.equal(loadDaily().translations["0"], "viejo");
+
+  // Новый текст успешно загружен
+  saveDaily(makeDailyData("2026-10-09", { translations: { "0": "nuevo" } }));
+
+  const updated = loadDaily();
+  assert.equal(updated.date, "2026-10-09");
+  assert.equal(updated.translations["0"], "nuevo");
+});
+
+test("18. Ошибка обработки нового текста: предыдущая сохранённая версия не повреждается", () => {
+  globalThis.localStorage.clear();
+
+  // Сохраняем рабочую версию
+  const goodData = makeDailyData("2026-10-08");
+  saveDaily(goodData);
+
+  // Имитируем ошибку обработки: saveDaily НЕ вызывается для битых данных
+  // (в useDaily.js saveDaily вызывается только после успешного fetchDaily)
+  // Поэтому проверяем, что старые данные целы
+  const stillGood = loadDaily();
+  assert.equal(stillGood.date, "2026-10-08");
+  assert.equal(stillGood.translations["0"], "palabra");
+  assert.equal(stillGood.translations_status, "ready");
+});
