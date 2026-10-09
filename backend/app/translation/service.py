@@ -1,5 +1,6 @@
 """Выбор слов, кэш (слово + предложение + язык), батчи в OpenRouter."""
 from __future__ import annotations
+import asyncio
 import hashlib
 import logging
 from .openrouter import OpenRouterClient, TranslationError
@@ -26,8 +27,8 @@ class TranslationService:
         self.store, self.client, self.max_share = store, client, max_share
 
     def _needed(self, content: dict) -> list[int]:
-        # Legacy auto-translation path is disabled; this method is kept for compatibility.
-        return []
+        order = content.get("order", [])
+        return list(order) if order else [int(k) for k in content.get("meta", {}).keys()]
 
     def _lookup(self, content: dict):
         ids = self._needed(content)
@@ -41,14 +42,36 @@ class TranslationService:
             return tr, "ready"
         return tr, ("pending" if self.client else "unavailable")
 
-    async def ensure(self, content: dict):
+    async def ensure(self, content: dict, spanish_reference: str = ""):
         ids, keys, tr = self._lookup(content)
         missing = [i for i in ids if i not in tr]
         if not missing:
             return tr, "ready"
         if not self.client:
             return tr, "unavailable"
-        return tr, "ready"
+        sem = asyncio.Semaphore(3)
+
+        async def run(part):
+            items = [{"id": i, "word": content["meta"][str(i)]["w"],
+                      "lemma": content["meta"][str(i)]["lemma"],
+                      "sentence": content["meta"][str(i)]["sent"]} for i in part]
+            async with sem:
+                return await self.client.translate_batch(items, spanish_reference=spanish_reference)
+
+        parts = [missing[i:i + CHUNK] for i in range(0, len(missing), CHUNK)]
+        results = await asyncio.gather(*(run(p) for p in parts), return_exceptions=True)
+        new = {}
+        for r in results:
+            if isinstance(r, TranslationError):
+                log.warning("Батч перевода не удался: %s", r)
+            elif isinstance(r, dict):
+                new.update(r)
+            elif isinstance(r, Exception):
+                log.warning("Исключение при переводе батча: %s", r)
+        if new:
+            self.store.put_translations({keys[i]: es for i, es in new.items() if i in keys})
+            tr.update(new)
+        return tr, ("ready" if len(tr) == len(ids) else "partial")
 
     async def translate_word(self, *, date: str, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None):
         if not word or not sentence:

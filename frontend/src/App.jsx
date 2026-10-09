@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { translateWord } from "./api.js";
 import { loadTranslations, saveTranslations } from "./lib/storage.js";
 import Scripture from "./components/Scripture.jsx";
@@ -33,8 +33,7 @@ export default function App() {
     saveTranslations(data.date, manualTranslations);
   }, [data?.date, manualTranslations]);
 
-  const baseTranslations = data?.translations || {};
-  const visibleTranslations = useMemo(() => ({ ...baseTranslations, ...manualTranslations }), [baseTranslations, manualTranslations]);
+  const visibleTranslations = manualTranslations;
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
     if (!data?.date || !sentence) {
@@ -49,6 +48,15 @@ export default function App() {
       });
       return;
     }
+
+    // 1. Проверяем предварительно подготовленный перевод
+    const prepared = data?.translations?.[key];
+    if (prepared && prepared !== word) {
+      setManualTranslations((prev) => ({ ...prev, [key]: prepared }));
+      return;
+    }
+
+    // 2. Резервный запрос к API, если перевод ещё не был подготовлен
     try {
       const payload = {
         word,
@@ -64,7 +72,7 @@ export default function App() {
       }
       setManualTranslations((prev) => ({ ...prev, [key]: translated }));
     } catch {
-      // Ошибка перевода не ломает UX.
+      // Ошибка перевода не ломает UX. Исходное слово остаётся на русском.
     }
   };
 

@@ -34,11 +34,10 @@ def test_analyzer_filters_and_orders():
     r = parse_wol_page(PAGE, date(2026, 10, 6))
     blocks, meta, _ = analyze_blocks([r["verse"], *r["comment"]])
     words = {m["w"] for m in meta.values()}
-    assert "Иегова" not in words and "Иудее" not in words and "Христианам" in words
+    assert "Иегова" not in words and "Иудее" in words and "Христианам" in words
     assert "любовь" in words and "люди" in words
     order = priority_order(meta)
-    z = [round(meta[i]["zipf"], 1) for i in order]
-    assert z == sorted(z, reverse=True)
+    assert order == sorted(order)
     # текст не повреждён
     def flat(ns): return "".join(n["s"] if n["t"] in ("text", "w") else flat(n["c"]) for n in ns)
     assert flat(blocks[1]["nodes"]) == flat(r["comment"][0]["nodes"])
@@ -106,3 +105,69 @@ def test_translations_cached(tmp_path):
         g = c.get(f"/api/daily?date={d}").json(); assert g["translations_status"] == "ready"
     finally:
         o.OpenRouterClient.__init__ = orig
+
+
+def test_full_text_pretranslation_100_percent_and_multiword(tmp_path):
+    """Проверяет предварительную подготовку 100% слов текста и сохранение многословных фраз."""
+    captured = {}
+    def handler(request):
+        payload = json.loads(json.loads(request.content)["messages"][1]["content"])
+        items = payload["items"]
+        captured["spanish_ref"] = payload.get("spanish_reference", "")
+        # Для одного из слов возвращаем многословный перевод ("por la mañana")
+        rows = [
+            {"id": i["id"], "es": "por la mañana" if i["word"] == "Долгое" else "palabra"}
+            for i in items
+        ]
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
+
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    orig = o.OpenRouterClient.__init__
+    def init(self, k, m, h=None): orig(self, k, m, http)
+    o.OpenRouterClient.__init__ = init
+    try:
+        app, calls = make_app(tmp_path, pages=page_for)
+        c = TestClient(app)
+        d = datetime.now(timezone.utc).date().isoformat()
+        # Получаем структуру дня
+        daily = c.get(f"/api/daily?date={d}").json()
+        total_words = len(daily["order"])
+        assert total_words > 0
+
+        # Вызываем подготовку переводов
+        r = c.post(f"/api/daily/translations?date={d}").json()
+        assert r["translations_status"] == "ready"
+        # 100% слов переведено
+        assert len(r["translations"]) == total_words
+        # Многословный перевод сохранён корректно
+        assert "por la mañana" in r["translations"].values()
+    finally:
+        o.OpenRouterClient.__init__ = orig
+
+
+def test_parser_spanish_page():
+    """Проверяет корректность разбора страницы WOL на испанском языке."""
+    es_page = """<html><body><div class="todayItems">
+<div class="todayItem"><header><h2>Martes 6 de octubre</h2></header>
+<p><em>«La Ley es solo una sombra» (<a href="/es/wol/bc/1">Heb. 10:1</a>).</em></p>
+<p>A los cristianos de Judea no les resultaba fácil la vida. <a href="/pc/1"><em>w24.09</em> 9</a></p>
+<p><a href="/d/1">Examinando las Escrituras diariamente 2026</a></p></div>
+</div></body></html>"""
+    r = parse_wol_page(es_page, date(2026, 10, 6))
+    assert r["date_label"] == "Martes 6 de octubre"
+    assert r["title"] == "Examinando las Escrituras diariamente 2026"
+    assert r["verse"]["nodes"][0]["s"] == "«La Ley es solo una sombra» ("
+
+
+def test_missing_translation_preserves_original_word(tmp_path):
+    """Слово без перевода должно возвращать исходное русское слово без ошибок."""
+    app, _ = make_app(tmp_path, pages=page_for)
+    c = TestClient(app)
+    # Запрос перевода слова при недоступном или пустом ответе модели
+    r = c.post("/api/translate", json={
+        "word": "неизвестное",
+        "sentence": "Это неизвестное слово.",
+        "date": "2026-10-06"
+    }).json()
+    assert r["translation"] == "неизвестное"

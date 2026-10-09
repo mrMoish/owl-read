@@ -38,7 +38,25 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None)
             content, notice = await daily.get(date)
         except WolError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
-        return daily.public(content, {}, "ready", notice)
+        translations, status = tr.cached(content)
+        return daily.public(content, translations, status, notice)
+
+    @app.post("/api/daily/translations")
+    async def make_translations(response: Response, date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$")):
+        response.headers["Cache-Control"] = "no-store"
+        try:
+            content, notice = await daily.get(date)
+        except WolError as e:
+            raise HTTPException(503, f"Материал недоступен: {e}")
+        spanish_reference = ""
+        try:
+            spanish_content, _ = await daily.get_spanish(date or None)
+            spanish_reference = _flatten_daily_text(spanish_content)
+        except WolError:
+            spanish_reference = ""
+        translations, status = await tr.ensure(content, spanish_reference=spanish_reference)
+        return {"date": content["date"], "translations": {str(k): v for k, v in translations.items()},
+                "translations_status": status}
 
     @app.post("/api/translate")
     async def translate_word(response: Response, payload: dict):

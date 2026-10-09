@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchDaily } from "./api.js";
+import { fetchDaily, requestTranslations } from "./api.js";
 import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
 
-/** При каждом запуске грузит материал дня без автоматического массового перевода. */
+/** При каждом запуске грузит материал дня и заранее подготавливает переводы. */
 export function useDaily() {
   const [state, setState] = useState(() => ({ data: loadDaily(), loading: true, error: null, notice: null }));
   const busy = useRef(false);
@@ -13,9 +13,23 @@ export function useDaily() {
     const date = localDate();
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const data = await fetchDaily(date);
+      let data = await fetchDaily(date);
       saveDaily(data);
       setState({ data, loading: false, error: null, notice: data.notice });
+      if (data.translations_status === "pending" || data.translations_status === "partial") {
+        try {
+          const t = await requestTranslations(date);
+          data = {
+            ...data,
+            translations: { ...(data.translations || {}), ...(t.translations || {}) },
+            translations_status: t.translations_status,
+          };
+          saveDaily(data);
+          setState((s) => ({ ...s, data }));
+        } catch {
+          // Если фоновый перевод не удался, слова останутся на русском
+        }
+      }
     } catch (e) {
       setState((s) => ({
         ...s, loading: false,

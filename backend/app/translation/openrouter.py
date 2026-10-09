@@ -123,13 +123,16 @@ class OpenRouterClient:
                 await http.aclose()
         raise TranslationError(f"OpenRouter недоступен: {last}")
 
-    async def translate_batch(self, items: list[dict]) -> dict[int, str]:
+    async def translate_batch(self, items: list[dict], spanish_reference: str = "") -> dict[int, str]:
         """items: [{id, word, lemma, sentence}] -> {id: es}. Слова без перевода просто отсутствуют."""
+        user_content: dict = {"items": items}
+        if spanish_reference:
+            user_content["spanish_reference"] = spanish_reference
         body = {
             "model": self.model, "temperature": 0.1,
             "response_format": {"type": "json_object"},
             "messages": [{"role": "system", "content": SYSTEM},
-                         {"role": "user", "content": json.dumps({"items": items}, ensure_ascii=False)}],
+                         {"role": "user", "content": json.dumps(user_content, ensure_ascii=False)}],
         }
         headers = {"Authorization": f"Bearer {self.api_key}", "X-Title": "Daily Reader"}
         own = self._http is None

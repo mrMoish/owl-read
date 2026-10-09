@@ -13,7 +13,10 @@ from .fetcher import WolError
 
 MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа",
           "сентября", "октября", "ноября", "декабря"]
-STOP_PREFIXES = ("добро пожаловать", "поделиться", "это онлайн-библиотека")
+ES_MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+             "septiembre", "octubre", "noviembre", "diciembre"]
+STOP_PREFIXES = ("добро пожаловать", "поделиться", "это онлайн-библиотека",
+                 "bienvenido", "compartir", "esta es una biblioteca")
 
 
 def _clean(s: str) -> str:
@@ -80,10 +83,12 @@ def _container(h2: Tag) -> Tag:
 
 def parse_wol_page(html: str, day: date, base: str = "https://wol.jw.org") -> dict:
     soup = BeautifulSoup(html, "html.parser")
-    label = f"{day.day} {MONTHS[day.month - 1]}"
-    heading = next((h for h in soup.find_all("h2") if label in _clean(h.get_text()).lower()), None)
+    ru_label = f"{day.day} {MONTHS[day.month - 1]}"
+    es_label = f"{day.day} de {ES_MONTHS[day.month - 1]}"
+    heading = next((h for h in soup.find_all("h2")
+                    if ru_label in _clean(h.get_text()).lower() or es_label in _clean(h.get_text()).lower()), None)
     if heading is None:
-        raise WolError(f"На странице нет материала за {label} (разметка изменилась или дата недоступна)")
+        raise WolError(f"На странице нет материала за {ru_label} (разметка изменилась или дата недоступна)")
 
     cont = _container(heading)
     if cont is heading:  # h2 и абзацы — соседи в общем родителе
