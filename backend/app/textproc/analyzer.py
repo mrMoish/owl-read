@@ -30,7 +30,8 @@ def judge(word: str, first_in_sentence: bool):
         return None
     best = parses[0]
     lemma = best.normal_form
-    return (lemma, 0)
+    pos = str(best.tag.POS or "")
+    return (lemma, pos)
 
 
 class _Ctx:
@@ -90,7 +91,7 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0):
                         if m.start() > last:
                             res.append({"t": "text", "s": s[last:m.start()]})
                         res.append({"t": "w", "id": nid, "s": m.group()})
-                        meta[nid] = {"w": m.group(), "lemma": j[0], "sent": sent}
+                        meta[nid] = {"w": m.group(), "lemma": j[0], "pos": j[1], "sent": sent}
                         nid += 1
                         last = m.end()
                 if last < len(s):
