@@ -260,3 +260,79 @@ test("10. Корректная замена, когда перевод сост�
 
   assert.equal(visible["0"], "por la mañana");
 });
+
+// ─── Тесты офлайн-режима ─────────────────────────────────────────────────────
+
+import { saveDaily, loadDaily } from "./storage.js";
+
+/**
+ * Упрощённая реализация логики catch-блока из useDaily.js —
+ * проверяем её поведение без запуска React-хука.
+ */
+function simulateCatchBlock(cachedData, requestedDate) {
+  const s = { data: cachedData };
+  return {
+    data: s.data ?? null,
+    loading: false,
+    error: s.data
+      ? null
+      : "Не удалось получить материал. Проверьте подключение и попробуйте снова.",
+    notice: s.data
+      ? s.data.date === requestedDate
+        ? "Нет связи с сервером — показан сохранённый выпуск."
+        : `Не удалось обновить материал. Показан сохранённый выпуск за ${s.data.date}.`
+      : null,
+  };
+}
+
+test("11. Офлайн: кэш за тот же день — показывается текст без ошибки", () => {
+  globalThis.localStorage.clear();
+
+  const savedData = {
+    date: "2026-10-09",
+    content: { verse: [], comment: [] },
+    meta: { "0": { w: "слово", lemma: "слово", sent: "." } },
+    translations: { "0": "palabra" },
+    translations_status: "ready",
+  };
+  saveDaily(savedData);
+
+  const cached = loadDaily();
+  const result = simulateCatchBlock(cached, "2026-10-09");
+
+  assert.equal(result.error, null);
+  assert.ok(result.notice?.includes("сохранённый выпуск"));
+  assert.equal(result.data?.date, "2026-10-09");
+  assert.equal(result.data?.translations?.["0"], "palabra");
+});
+
+test("12. Офлайн: кэш за другой день — показывается старый текст с уведомлением о дате", () => {
+  globalThis.localStorage.clear();
+
+  const savedData = {
+    date: "2026-10-08",
+    content: { verse: [], comment: [] },
+    meta: { "1": { w: "любовь", lemma: "любовь", sent: "." } },
+    translations: { "1": "amor" },
+    translations_status: "ready",
+  };
+  saveDaily(savedData);
+
+  const cached = loadDaily();
+  const result = simulateCatchBlock(cached, "2026-10-09");
+
+  assert.equal(result.error, null);
+  assert.ok(result.notice?.includes("2026-10-08"));
+  assert.equal(result.data?.date, "2026-10-08");
+});
+
+test("13. Офлайн: нет кэша (первый запуск) — показывается ошибка", () => {
+  globalThis.localStorage.clear();
+
+  const cached = loadDaily(); // вернёт null
+  const result = simulateCatchBlock(cached, "2026-10-09");
+
+  assert.equal(result.data, null);
+  assert.equal(result.notice, null);
+  assert.ok(result.error?.includes("Проверьте подключение"));
+});
