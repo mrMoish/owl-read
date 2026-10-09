@@ -7,6 +7,8 @@ import {
   applyLearnedTranslations,
 } from "./learned.js";
 
+import { reorderNodes, shouldSwapPair } from "./swap.js";
+
 import {
   loadLearnedWords,
   saveLearnedWords,
@@ -259,4 +261,31 @@ test("10. Корректная замена, когда перевод сост�
   });
 
   assert.equal(visible["0"], "por la mañana");
+});
+
+test("11. Перестановка порядка слов для сочетаний Прилагательное + Существительное («маленькая группа» -> «grupo pequeña»)", () => {
+  const nodes = [
+    { t: "text", s: "Un " },
+    { t: "w", id: 0, s: "маленькая" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "группа" },
+  ];
+  const meta = {
+    "0": { w: "маленькая", lemma: "маленький", pos: "ADJF" },
+    "1": { w: "группа", lemma: "группа", pos: "NOUN" },
+  };
+
+  // Без перевода второго слова порядок сохраняется
+  const untranslated = reorderNodes(nodes, {}, meta);
+  assert.equal(untranslated[1].id, 0);
+  assert.equal(untranslated[3].id, 1);
+
+  // Когда второе слово переведено («группа» -> «grupo»), порядок визуально меняется
+  const translations = { "1": "grupo" };
+  assert.equal(shouldSwapPair(nodes[1], nodes[3], translations, meta), true);
+
+  const reordered = reorderNodes(nodes, translations, meta);
+  // Первым становится узел id 1 («группа»), затем пробел, затем узел id 0 («маленькая»)
+  assert.equal(reordered[1].id, 1);
+  assert.equal(reordered[3].id, 0);
 });

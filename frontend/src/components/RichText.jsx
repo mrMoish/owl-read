@@ -1,14 +1,8 @@
-import React from "react";
+import React, { useLayoutEffect, useRef } from "react";
+import { reorderNodes } from "../lib/swap.js";
 
-function flattenText(nodes = []) {
-  return nodes.map((n) => {
-    if (n.t === "text") return n.s;
-    if (n.c) return flattenText(n.c);
-    return "";
-  }).join("");
-}
-
-function Node({ node, index, translations, onWordClick, meta }) {
+function Node({ node, index, translations, onWordClick, meta, registerRef }) {
+  if (!node) return null;
   if (node.t === "text") return node.s;
   if (node.t === "w") {
     const id = String(node.id);
@@ -18,8 +12,9 @@ function Node({ node, index, translations, onWordClick, meta }) {
     const content = translated || word;
     return (
       <span
-        key={index}
-        className="word"
+        key={id}
+        ref={(el) => registerRef && registerRef(id, el)}
+        className={`word ${translated ? "word--translated" : ""}`}
         onClick={() => onWordClick({
           id: node.id,
           word,
@@ -49,7 +44,15 @@ function Node({ node, index, translations, onWordClick, meta }) {
   }
 
   const children = Array.isArray(node.c) ? node.c.map((child, idx) => (
-    <Node key={`${node.t}-${idx}`} node={child} index={idx} translations={translations} onWordClick={onWordClick} meta={meta} />
+    <Node
+      key={`${node.t}-${idx}`}
+      node={child}
+      index={idx}
+      translations={translations}
+      onWordClick={onWordClick}
+      meta={meta}
+      registerRef={registerRef}
+    />
   )) : null;
 
   if (node.t === "em") return <em>{children}</em>;
@@ -59,7 +62,70 @@ function Node({ node, index, translations, onWordClick, meta }) {
 }
 
 export default function RichText({ nodes = [], translations = {}, onWordClick = () => {}, meta = {} }) {
-  return nodes.map((node, index) => (
-    <Node key={`${index}-${node.t}`} node={node} index={index} translations={translations} onWordClick={onWordClick} meta={meta} />
+  const wordRefs = useRef({});
+  const prevRects = useRef({});
+
+  const registerRef = (id, el) => {
+    if (el) {
+      wordRefs.current[id] = el;
+    } else {
+      delete wordRefs.current[id];
+    }
+  };
+
+  const reordered = reorderNodes(nodes, translations, meta);
+
+  useLayoutEffect(() => {
+    const currentRects = {};
+    for (const [id, el] of Object.entries(wordRefs.current)) {
+      if (el) {
+        currentRects[id] = el.getBoundingClientRect();
+      }
+    }
+
+    // FLIP Animation
+    for (const [id, el] of Object.entries(wordRefs.current)) {
+      if (!el) continue;
+      const prev = prevRects.current[id];
+      const current = currentRects[id];
+
+      if (prev && current) {
+        const deltaX = prev.left - current.left;
+        const deltaY = prev.top - current.top;
+
+        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+          // Invert
+          el.style.transition = "none";
+          el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+          el.classList.add("word--swapping");
+
+          // Play
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              el.style.transition = "transform 0.4s cubic-bezier(0.2, 0, 0.2, 1)";
+              el.style.transform = "";
+              setTimeout(() => {
+                el.classList.remove("word--swapping");
+                el.style.transition = "";
+              }, 400);
+            });
+          });
+        }
+      }
+    }
+
+    prevRects.current = currentRects;
+  });
+
+  return reordered.map((node, index) => (
+    <Node
+      key={node.t === "w" ? String(node.id) : `${index}-${node.t}`}
+      node={node}
+      index={index}
+      translations={translations}
+      onWordClick={onWordClick}
+      meta={meta}
+      registerRef={registerRef}
+    />
   ));
 }
