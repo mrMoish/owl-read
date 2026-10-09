@@ -19,8 +19,10 @@ class DailyService:
         server = datetime.now(ZoneInfo(self.s.timezone)).date()
         if client_date:
             try:
-                return date.fromisoformat(client_date)
-            except ValueError:
+                parts = client_date.split("-")
+                if len(parts) == 3:
+                    return date(int(parts[0]), int(parts[1]), int(parts[2]))
+            except (ValueError, TypeError):
                 pass
         return server
 

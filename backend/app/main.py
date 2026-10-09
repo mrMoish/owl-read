@@ -32,7 +32,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None)
         return {"ok": True, "translation": bool(client)}
 
     @app.get("/api/daily")
-    async def get_daily(response: Response, date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$")):
+    async def get_daily(response: Response, date: str | None = Query(None, pattern=r"^\d{4}-\d{1,2}-\d{1,2}$")):
         response.headers["Cache-Control"] = "no-store"
         try:
             content, notice = await daily.get(date)
@@ -42,7 +42,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None)
         return daily.public(content, translations, status, notice)
 
     @app.post("/api/daily/translations")
-    async def make_translations(response: Response, date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$")):
+    async def make_translations(response: Response, date: str | None = Query(None, pattern=r"^\d{4}-\d{1,2}-\d{1,2}$")):
         response.headers["Cache-Control"] = "no-store"
         try:
             content, notice = await daily.get(date)

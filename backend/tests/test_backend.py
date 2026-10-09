@@ -174,16 +174,20 @@ def test_missing_translation_preserves_original_word(tmp_path):
 
 
 def test_custom_date_query_param(tmp_path):
-    """Проверяет возможность запроса произвольных дат через GET параметр ?date=YYYY-MM-DD."""
+    """Проверяет возможность запроса произвольных дат через GET параметр ?date=YYYY-MM-DD и ?date=YYYY-M-D."""
     app, calls = make_app(tmp_path, key="", pages=page_for)
     c = TestClient(app)
 
-    # Даты, сильно отличающиеся от сегодняшней даты (например, 2026-10-08 и 2026-10-11)
+    # Даты, сильно отличающиеся от сегодняшней даты, а также неполный формат без нуля
     d1 = "2026-10-08"
     d2 = "2026-10-11"
+    d3 = "2026-10-8"
 
     r1 = c.get(f"/api/daily?date={d1}").json()
     assert r1["date"] == d1
 
     r2 = c.get(f"/api/daily?date={d2}").json()
     assert r2["date"] == d2
+
+    r3 = c.get(f"/api/daily?date={d3}").json()
+    assert r3["date"] == "2026-10-08"

@@ -6,7 +6,7 @@ import { initialData, offlineState } from "./lib/offline.js";
 function activeDate() {
   if (typeof window !== "undefined" && window.location?.search) {
     const q = new URLSearchParams(window.location.search).get("date");
-    if (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) return q;
+    if (q && /^\d{4}-\d{1,2}-\d{1,2}$/.test(q)) return q;
   }
   return localDate();
 }
