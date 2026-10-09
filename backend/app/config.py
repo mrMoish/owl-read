@@ -26,8 +26,8 @@ def get_settings() -> Settings:
         openrouter_model=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
         db_path=Path(os.environ.get("DB_PATH", ROOT / "backend" / "data" / "app.sqlite3")),
         timezone=os.environ.get("APP_TIMEZONE", "America/Argentina/Buenos_Aires"),
-        wol_base_url=os.environ.get("WOL_BASE_URL", "https://wol.jw.org/ru/wol/h/r2/lp-u"),
-        es_wol_base_url=os.environ.get("WOL_ES_BASE_URL", "https://wol.jw.org/es/wol/h/r4/lp-s"),
+        wol_base_url=os.environ.get("WOL_BASE_URL", "https://wol.jw.org/ru/wol/h/r2/lp-u/2026/10/8"),
+        es_wol_base_url=os.environ.get("WOL_ES_BASE_URL", "https://wol.jw.org/es/wol/h/r4/lp-s/2026/10/8"),
         translate_max_share=0.5,
         frontend_dist=ROOT / "frontend" / "dist",
     )
