@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDaily, requestTranslations } from "./api.js";
 import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
+import { initialData, offlineState } from "./lib/offline.js";
 
 function activeDate() {
   if (typeof window !== "undefined" && window.location?.search) {
@@ -15,7 +16,7 @@ export function useDaily() {
   const [state, setState] = useState(() => {
     const cached = loadDaily();
     const target = activeDate();
-    return { data: cached?.date === target ? cached : null, loading: true, error: null, notice: null };
+    return { data: initialData(cached, target), loading: true, error: null, notice: null };
   });
   const busy = useRef(false);
 
@@ -43,12 +44,10 @@ export function useDaily() {
         }
       }
     } catch (e) {
+      // Сети нет: показываем сохранённый выпуск любой даты — обязательно с пометкой
       setState((s) => ({
         ...s, loading: false,
-        error: s.data ? null : "Не удалось получить материал. Проверьте подключение и попробуйте снова.",
-        notice: s.data ? (s.data.date === date
-          ? "Нет связи с сервером — показан сохранённый выпуск."
-          : `Не удалось обновить материал. Показан сохранённый выпуск за ${s.data.date}.`) : null,
+        ...offlineState({ shownData: s.data, cached: loadDaily(), targetDate: date }),
       }));
     } finally { busy.current = false; }
   }, []);
