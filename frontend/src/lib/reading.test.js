@@ -1,165 +1,262 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-// Моделируем логику отображения и замены слова, используемую в приложении:
-function createReadingSession({ preparedTranslations = {}, savedManualTranslations = {} }) {
-  let manualTranslations = { ...savedManualTranslations };
-  let apiCallsCount = 0;
+import {
+  normalizeLemma,
+  findMatchingTokenIds,
+  applyLearnedTranslations,
+} from "./learned.js";
 
-  // Изначально отображаются только вручную заменённые пользователем слова (visibleTranslations)
-  const getVisibleTranslations = () => ({ ...manualTranslations });
+import {
+  loadLearnedWords,
+  saveLearnedWords,
+  addLearnedWord,
+  removeLearnedWord,
+  clearLearnedWords,
+} from "./storage.js";
 
-  // Отображение конкретного токена
-  const renderWord = (node) => {
-    const id = String(node.id);
-    const visible = getVisibleTranslations();
-    return visible[id] || node.s;
+// Полифилл localStorage для изоляции тестов в Node.js
+const memoryStore = new Map();
+globalThis.localStorage = {
+  getItem: (key) => memoryStore.get(key) || null,
+  setItem: (key, val) => memoryStore.set(key, String(val)),
+  removeItem: (key) => memoryStore.delete(key),
+  clear: () => memoryStore.clear(),
+};
+
+test("1. Запоминание перевода в постоянном хранилище после нажатия", () => {
+  globalThis.localStorage.clear();
+
+  // Пользователь нажимает на слово с леммой «книга» и переводом «libro»
+  const res = addLearnedWord("книга", "libro");
+  assert.equal(res["книга"]?.primaryTranslation, "libro");
+  assert.deepEqual(res["книга"]?.translations, ["libro"]);
+
+  // Проверяем считывание из постоянного хранилища
+  const loaded = loadLearnedWords();
+  assert.equal(loaded["книга"]?.primaryTranslation, "libro");
+});
+
+test("2. Автоматическая замена повторений слова в текущем тексте", () => {
+  // Текст содержит два вхождения слова с id "0" и "5"
+  const meta = {
+    "0": { w: "любовь", lemma: "любовь", sent: "Бог есть любовь." },
+    "1": { w: "и", lemma: "и", sent: "Бог есть любовь." },
+    "5": { w: "любовь", lemma: "любовь", sent: "Проявляйте любовь." },
   };
-
-  // Обработчик клика по слову
-  const handleWordClick = async ({ id, word }, mockApiFallback = null) => {
-    const key = String(id);
-    if (manualTranslations[key]) {
-      // Повторный клик: возврат к исходному русскому слову
-      delete manualTranslations[key];
-      return;
-    }
-
-    // 1. Проверяем предварительно подготовленный перевод
-    const prepared = preparedTranslations[key];
-    if (prepared && prepared !== word) {
-      manualTranslations[key] = prepared;
-      return;
-    }
-
-    // 2. Резервный вызов API при отсутствии перевода в словаре
-    if (mockApiFallback) {
-      apiCallsCount++;
-      const res = await mockApiFallback(word);
-      if (res && res !== word) {
-        manualTranslations[key] = res;
-      }
-    }
-  };
-
-  return {
-    getManualTranslations: () => ({ ...manualTranslations }),
-    getVisibleTranslations,
-    renderWord,
-    handleWordClick,
-    getApiCallsCount: () => apiCallsCount,
-  };
-}
-
-test("1. Отсутствие отображения предварительно подготовленных переводов до нажатия", () => {
   const prepared = {
     "0": "amor",
-    "1": "vida",
-    "2": "por la mañana",
+    "5": "amor",
   };
-  const session = createReadingSession({ preparedTranslations: prepared });
-
-  // До клика: видимые переводы пусты
-  assert.deepEqual(session.getVisibleTranslations(), {});
-
-  // Слова рендерятся в исходном русском виде
-  assert.equal(session.renderWord({ id: 0, s: "любовь" }), "любовь");
-  assert.equal(session.renderWord({ id: 1, s: "жизнь" }), "жизнь");
-  assert.equal(session.renderWord({ id: 2, s: "утром" }), "утром");
-});
-
-test("2. Замена слова при нажатии без повторного обращения к переводчику (0 вызовов API)", async () => {
-  const prepared = {
-    "0": "amor",
-    "1": "vida",
-  };
-  const session = createReadingSession({ preparedTranslations: prepared });
-
-  let fallbackCalled = false;
-  const mockApi = async () => {
-    fallbackCalled = true;
-    return "api_result";
+  const learned = {
+    любовь: { lemma: "любовь", primaryTranslation: "amor", translations: ["amor"] },
   };
 
-  // Кликаем по слову "любовь"
-  await session.handleWordClick({ id: 0, word: "любовь" }, mockApi);
-
-  // Перевод подставился мгновенно
-  assert.equal(session.renderWord({ id: 0, s: "любовь" }), "amor");
-  // API НЕ вызывался
-  assert.equal(fallbackCalled, false);
-  assert.equal(session.getApiCallsCount(), 0);
-});
-
-test("3. Корректная замена, когда перевод состоит из нескольких слов (фраза)", async () => {
-  const prepared = {
-    "0": "por la mañana",
-    "1": "dar cuenta",
-  };
-  const session = createReadingSession({ preparedTranslations: prepared });
-
-  await session.handleWordClick({ id: 0, word: "утром" });
-  await session.handleWordClick({ id: 1, word: "заметить" });
-
-  // Вся испанская фраза отображается целиком
-  assert.equal(session.renderWord({ id: 0, s: "утром" }), "por la mañana");
-  assert.equal(session.renderWord({ id: 1, s: "заметить" }), "dar cuenta");
-});
-
-test("4. Сохранение состояния уже заменённых слов и возврат по повторному клику", async () => {
-  const prepared = {
-    "0": "palabra",
-    "1": "verdad",
-  };
-  const session = createReadingSession({ preparedTranslations: prepared });
-
-  // Заменяем первое слово
-  await session.handleWordClick({ id: 0, word: "слово" });
-  assert.equal(session.renderWord({ id: 0, s: "слово" }), "palabra");
-  assert.equal(session.renderWord({ id: 1, s: "истина" }), "истина");
-
-  // Заменяем второе слово — первое остаётся на испанском
-  await session.handleWordClick({ id: 1, word: "истина" });
-  assert.equal(session.renderWord({ id: 0, s: "слово" }), "palabra");
-  assert.equal(session.renderWord({ id: 1, s: "истина" }), "verdad");
-
-  // Повторный клик на первое слово возвращает его на русский, второе остаётся
-  await session.handleWordClick({ id: 0, word: "слово" });
-  assert.equal(session.renderWord({ id: 0, s: "слово" }), "слово");
-  assert.equal(session.renderWord({ id: 1, s: "истина" }), "verdad");
-});
-
-test("5. Корректная обработка отсутствующего перевода (слово остаётся русским)", async () => {
-  // Словарь подготовлен, но в нём нет слова с id 5
-  const prepared = { "0": "amor" };
-  const session = createReadingSession({ preparedTranslations: prepared });
-
-  const failingMockApi = async () => {
-    throw new Error("Translation service offline");
-  };
-
-  // Клик по слову, у которого нет перевода в словаре и API недоступен
-  await session.handleWordClick({ id: 5, word: "редкое" }, async () => {
-    try {
-      return await failingMockApi();
-    } catch {
-      return null;
-    }
-  });
-
-  // Слово сохраняет исходный русский текст без ошибок
-  assert.equal(session.renderWord({ id: 5, s: "редкое" }), "редкое");
-});
-
-test("6. Восстановление состояния из сохранённых заменённых слов", () => {
-  const savedState = { "0": "amor" };
-  const prepared = { "0": "amor", "1": "paz" };
-  const session = createReadingSession({
+  const visible = applyLearnedTranslations({
+    meta,
     preparedTranslations: prepared,
-    savedManualTranslations: savedState,
+    learnedWords: learned,
   });
 
-  // Уже сохранённое слово сразу показывается на испанском, не заменённое — на русском
-  assert.equal(session.renderWord({ id: 0, s: "любовь" }), "amor");
-  assert.equal(session.renderWord({ id: 1, s: "мир" }), "мир");
+  // Оба вхождения автоматически заменены
+  assert.equal(visible["0"], "amor");
+  assert.equal(visible["5"], "amor");
+  // Другие слова не затронуты
+  assert.equal(visible["1"], undefined);
+});
+
+test("3. Автоматическая замена в последующих текстах (новый день)", () => {
+  // Пользователь уже выучил слово «мир»
+  const learned = {
+    мир: { lemma: "мир", primaryTranslation: "paz", translations: ["paz"] },
+  };
+
+  // Загружается совершенно новый текст за другой день
+  const nextDayMeta = {
+    "10": { w: "мир", lemma: "мир", sent: "Да будет мир." },
+    "11": { w: "с", lemma: "с", sent: "Да будет мир." },
+    "12": { w: "вами", lemma: "вы", sent: "Да будет мир." },
+  };
+  const nextDayPrepared = {
+    "10": "paz",
+  };
+
+  const visible = applyLearnedTranslations({
+    meta: nextDayMeta,
+    preparedTranslations: nextDayPrepared,
+    learnedWords: learned,
+  });
+
+  // Слово «мир» в новом тексте автоматически отображается на испанском
+  assert.equal(visible["10"], "paz");
+  // Неизученные слова остаются русскими
+  assert.equal(visible["11"], undefined);
+  assert.equal(visible["12"], undefined);
+});
+
+test("4. Сохранение предпочтений после перезагрузки (извлечение из storage)", () => {
+  globalThis.localStorage.clear();
+  addLearnedWord("слово", "palabra");
+
+  // Имитируем перезагрузку страницы (чтение из storage заново)
+  const freshLoaded = loadLearnedWords();
+  assert.ok(freshLoaded["слово"]);
+  assert.equal(freshLoaded["слово"].primaryTranslation, "palabra");
+
+  const meta = { "0": { w: "словом", lemma: "слово" } };
+  const visible = applyLearnedTranslations({
+    meta,
+    learnedWords: freshLoaded,
+  });
+  assert.equal(visible["0"], "palabra");
+});
+
+test("5. Корректная обработка словоформ одной леммы («книга», «книги», «книгу», «книгой»)", () => {
+  // Пользователь нажал на словоформу «книгу» (лемма: «книга»)
+  const targetLemma = normalizeLemma("книга");
+
+  // В тексте встречаются различные словоформы этой же леммы
+  const meta = {
+    "0": { w: "книга", lemma: "книга" },
+    "1": { w: "книги", lemma: "книга" },
+    "2": { w: "книгу", lemma: "книга" },
+    "3": { w: "книгой", lemma: "книга" },
+    "4": { w: "человек", lemma: "человек" },
+  };
+
+  const matchingIds = findMatchingTokenIds(meta, targetLemma);
+  // Все 4 формы одной леммы надёжно найдены
+  assert.deepEqual(matchingIds.sort(), ["0", "1", "2", "3"]);
+
+  const learned = {
+    книга: { lemma: "книга", primaryTranslation: "libro", translations: ["libro"] },
+  };
+  const prepared = {
+    "0": "libro",
+    "1": "libros",
+    "2": "libro",
+    "3": "libro",
+  };
+
+  const visible = applyLearnedTranslations({
+    meta,
+    preparedTranslations: prepared,
+    learnedWords: learned,
+  });
+
+  assert.equal(visible["0"], "libro");
+  assert.equal(visible["1"], "libros");
+  assert.equal(visible["2"], "libro");
+  assert.equal(visible["3"], "libro");
+  assert.equal(visible["4"], undefined);
+});
+
+test("6. Отсутствие замены частей других слов («том» не заменяет «потом»)", () => {
+  const meta = {
+    "0": { w: "том", lemma: "том" },
+    "1": { w: "потом", lemma: "потом" },
+    "2": { w: "автомобиль", lemma: "автомобиль" },
+  };
+
+  // Поиск токенов для леммы «том»
+  const matches = findMatchingTokenIds(meta, "том");
+  assert.deepEqual(matches, ["0"]);
+
+  const learned = {
+    том: { lemma: "том", primaryTranslation: "tomo", translations: ["tomo"] },
+  };
+
+  const visible = applyLearnedTranslations({
+    meta,
+    learnedWords: learned,
+  });
+
+  // Заменён только самостоятельный токен «том»
+  assert.equal(visible["0"], "tomo");
+  // Токены «потом» и «автомобиль» не содержат ошибочной подстрочной замены
+  assert.equal(visible["1"], undefined);
+  assert.equal(visible["2"], undefined);
+});
+
+test("7. Обработка многозначных слов с сохранением контекстного перевода", () => {
+  // Слово «мир» в разных контекстах: «мир во всём мире» (paz) vs «сотворение мира» (mundo)
+  const meta = {
+    "0": { w: "мир", lemma: "мир", sent: "Христос дарует мир." },
+    "1": { w: "мира", lemma: "мир", sent: "Бог создал основы мира." },
+  };
+  const prepared = {
+    "0": "paz",
+    "1": "mundo",
+  };
+  const learned = {
+    мир: { lemma: "мир", primaryTranslation: "paz", translations: ["paz", "mundo"] },
+  };
+
+  const visible = applyLearnedTranslations({
+    meta,
+    preparedTranslations: prepared,
+    learnedWords: learned,
+  });
+
+  // Каждое предложение получает свой правильный контекстный перевод
+  assert.equal(visible["0"], "paz");
+  assert.equal(visible["1"], "mundo");
+});
+
+test("8. Возможность удалить сохранённый выбор (unlearn) и сбросить все слова", () => {
+  globalThis.localStorage.clear();
+  addLearnedWord("радость", "alegría");
+  addLearnedWord("надежда", "esperanza");
+
+  assert.equal(loadLearnedWords()["радость"]?.primaryTranslation, "alegría");
+  assert.equal(loadLearnedWords()["надежда"]?.primaryTranslation, "esperanza");
+
+  // Удаляем отдельное сохранённое слово
+  removeLearnedWord("радость");
+  const afterRemove = loadLearnedWords();
+  assert.equal(afterRemove["радость"], undefined);
+  assert.ok(afterRemove["надежда"]);
+
+  // Сбрасываем все сохранённые слова
+  clearLearnedWords();
+  assert.deepEqual(loadLearnedWords(), {});
+});
+
+test("9. Отсутствие повторных запросов к переводчику при наличии подготовленного перевода", () => {
+  let apiCallCount = 0;
+  const mockApi = () => {
+    apiCallCount++;
+    return Promise.resolve("api_res");
+  };
+
+  const meta = { "0": { w: "жизнь", lemma: "жизнь" } };
+  const prepared = { "0": "vida" };
+  const learned = {
+    жизнь: { lemma: "жизнь", primaryTranslation: "vida", translations: ["vida"] },
+  };
+
+  const visible = applyLearnedTranslations({
+    meta,
+    preparedTranslations: prepared,
+    learnedWords: learned,
+  });
+
+  assert.equal(visible["0"], "vida");
+  assert.equal(apiCallCount, 0);
+});
+
+test("10. Корректная замена, когда перевод состоит из нескольких слов (фраза)", () => {
+  const meta = { "0": { w: "утром", lemma: "утром" } };
+  const prepared = { "0": "por la mañana" };
+  const learned = {
+    утром: { lemma: "утром", primaryTranslation: "por la mañana", translations: ["por la mañana"] },
+  };
+
+  const visible = applyLearnedTranslations({
+    meta,
+    preparedTranslations: prepared,
+    learnedWords: learned,
+  });
+
+  assert.equal(visible["0"], "por la mañana");
 });

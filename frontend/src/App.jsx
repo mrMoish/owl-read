@@ -1,6 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { translateWord } from "./api.js";
-import { loadTranslations, saveTranslations } from "./lib/storage.js";
+import {
+  loadTranslations,
+  saveTranslations,
+  loadLearnedWords,
+  addLearnedWord,
+  removeLearnedWord,
+} from "./lib/storage.js";
+import {
+  normalizeLemma,
+  findMatchingTokenIds,
+  applyLearnedTranslations,
+} from "./lib/learned.js";
 import Scripture from "./components/Scripture.jsx";
 import Comment from "./components/Comment.jsx";
 import { useDaily } from "./useDaily.js";
@@ -21,6 +32,7 @@ function articleContext(data) {
 
 export default function App() {
   const { data, loading, error, notice, reload } = useDaily();
+  const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
   const [manualTranslations, setManualTranslations] = useState({});
 
   useEffect(() => {
@@ -33,47 +45,77 @@ export default function App() {
     saveTranslations(data.date, manualTranslations);
   }, [data?.date, manualTranslations]);
 
-  const visibleTranslations = manualTranslations;
+  // Вычисляем видимые переводы: локальные замены + глобально запомненные слова и словоформы
+  const visibleTranslations = useMemo(() => {
+    return applyLearnedTranslations({
+      meta: data?.meta,
+      preparedTranslations: data?.translations,
+      learnedWords,
+      manualTranslations,
+    });
+  }, [data?.meta, data?.translations, learnedWords, manualTranslations]);
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
     if (!data?.date || !sentence) {
       return;
     }
     const key = String(id);
-    if (visibleTranslations[key]) {
+    const normLemma = normalizeLemma(lemma || word);
+    const isCurrentlyTranslated = Boolean(visibleTranslations[key]);
+
+    if (isCurrentlyTranslated) {
+      // Пользователь нажал на переведённое слово -> сброс слова и его словоформ на русский
+      const nextLearned = removeLearnedWord(normLemma);
+      setLearnedWords(nextLearned || {});
+
+      const matchingIds = findMatchingTokenIds(data?.meta, normLemma);
       setManualTranslations((prev) => {
         const next = { ...prev };
         delete next[key];
+        for (const mid of matchingIds) {
+          delete next[mid];
+        }
         return next;
       });
       return;
     }
 
-    // 1. Проверяем предварительно подготовленный перевод
-    const prepared = data?.translations?.[key];
-    if (prepared && prepared !== word) {
-      setManualTranslations((prev) => ({ ...prev, [key]: prepared }));
+    // 1. Получаем перевод для нажатого слова (подготовленный или fallback)
+    let translated = data?.translations?.[key];
+    if (!translated || translated === word) {
+      try {
+        const payload = {
+          word,
+          lemma: lemma || word,
+          sentence,
+          context: context || articleContext(data),
+          date: data.date,
+        };
+        const res = await translateWord(payload);
+        translated = res?.translation || res?.original || word;
+      } catch {
+        // Ошибка перевода не ломает UX. Исходное слово остаётся на русском.
+      }
+    }
+
+    if (!translated || translated === word) {
       return;
     }
 
-    // 2. Резервный запрос к API, если перевод ещё не был подготовлен
-    try {
-      const payload = {
-        word,
-        lemma: lemma || word,
-        sentence,
-        context: context || articleContext(data),
-        date: data.date,
-      };
-      const res = await translateWord(payload);
-      const translated = res?.translation || res?.original || word;
-      if (!translated || translated === word) {
-        return;
+    // 2. Сохраняем выбор пользователя в постоянном глобальном хранилище
+    const nextLearned = addLearnedWord(normLemma, translated);
+    setLearnedWords(nextLearned || {});
+
+    // 3. Заменяем все вхождения этого слова и его словоформ в текущем тексте
+    const matchingIds = findMatchingTokenIds(data?.meta, normLemma);
+    setManualTranslations((prev) => {
+      const next = { ...prev, [key]: translated };
+      for (const mid of matchingIds) {
+        const contextEs = data?.translations?.[mid];
+        next[mid] = (contextEs && contextEs !== data?.meta?.[mid]?.w) ? contextEs : translated;
       }
-      setManualTranslations((prev) => ({ ...prev, [key]: translated }));
-    } catch {
-      // Ошибка перевода не ломает UX. Исходное слово остаётся на русском.
-    }
+      return next;
+    });
   };
 
   return (
