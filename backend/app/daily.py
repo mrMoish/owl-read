@@ -15,13 +15,11 @@ class DailyService:
         self._locks: dict[str, asyncio.Lock] = {}
 
     def resolve_date(self, client_date: str | None) -> date:
-        """Берём локальную дату клиента (если правдоподобна), иначе — дату сервера в APP_TIMEZONE."""
+        """Берём локальную дату клиента (если передана и валидна), иначе — дату сервера в APP_TIMEZONE."""
         server = datetime.now(ZoneInfo(self.s.timezone)).date()
         if client_date:
             try:
-                d = date.fromisoformat(client_date)
-                if abs((d - datetime.now(timezone.utc).date()).days) <= 1:
-                    return d
+                return date.fromisoformat(client_date)
             except ValueError:
                 pass
         return server
