@@ -194,7 +194,7 @@ def test_custom_date_query_param(tmp_path):
 
 
 def test_english_mode_support(tmp_path):
-    """Проверяет работу английского режима через ?en и ?lang=en."""
+    """Проверяет работу английского режима через ?en и ?lang=en (русский текст в основе, английский как справка)."""
     en_page = """<html><body><div class="todayItems">
 <div class="todayItem"><header><h2>Thursday, October 8</h2></header>
 <p><em>«I have seen the Lord!» (<a href="/en/wol/bc/1">John 20:18</a>).</em></p>
@@ -205,16 +205,18 @@ def test_english_mode_support(tmp_path):
     async def fetch_en(base, day):
         return en_page
 
+    async def fetch_ru(base, day):
+        return page_for(day)
+
     s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="")
-    app = create_app(s, fetch_english=fetch_en)
+    app = create_app(s, fetch=fetch_ru, fetch_english=fetch_en)
     c = TestClient(app)
 
-    # Проверяем получение ежедневного материала на английском через ?en=1
-    r = c.get("/api/daily?date=2026-10-08&en=1").json()
-    assert r["date_label"] == "Thursday, October 8"
-    assert any(m["w"] == "Mary" for m in r["meta"].values())
-    assert any(m["w"] == "disciples" for m in r["meta"].values())
+    # Проверяем получение ежедневного материала на русском языке через ?en=1
+    r = c.get("/api/daily?date=2026-10-06&en=1").json()
+    assert r["date_label"] == "X, 6 октября"
+    assert any(m["w"] == "Христианам" for m in r["meta"].values())
 
     # Проверяем также через ?lang=en
-    r2 = c.get("/api/daily?date=2026-10-08&lang=en").json()
-    assert r2["date_label"] == "Thursday, October 8"
+    r2 = c.get("/api/daily?date=2026-10-06&lang=en").json()
+    assert r2["date_label"] == "X, 6 октября"

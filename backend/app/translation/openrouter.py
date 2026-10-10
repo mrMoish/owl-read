@@ -20,12 +20,14 @@ SYSTEM_RU_ES = (
     "used in official JW Spanish material when relevant. "
     'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
 )
-SYSTEM_EN_RU = (
-    "You translate single English words, as used in a given sentence, into Russian (ru) "
-    "for a Russian native speaker who is learning English. For each item return the Russian word or short phrase (max 3 words) "
-    "that can REPLACE or translate the English word in place, matching its grammatical form (tense, case, number, "
-    "gender, form) so the meaning in context is clear and natural. "
+SYSTEM_RU_EN = (
+    "You translate single Russian words, as used in a given sentence, into English "
+    "for a language-learning reader. For each item return the English word or short phrase (max 3 words) "
+    "that can REPLACE the Russian word in place, matching its grammatical form (tense, person, number, "
+    "case function) so the sentence stays correct. Choose the sense that fits the sentence. "
     "Keep the first letter capitalised if the source word is. "
+    "Use the provided Russian sentence and the English WOL reference context to choose the most natural term "
+    "used in official JW English material when relevant. "
     'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
 )
 SINGLE_SYSTEM_RU_ES = (
@@ -40,11 +42,12 @@ SINGLE_SYSTEM_RU_ES = (
     "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.0-1.0}. "
     "If the translation is uncertain, return the original word rather than a broader phrase."
 )
-SINGLE_SYSTEM_EN_RU = (
-    "Translate the exact clicked English word only into Russian, not the surrounding words. "
-    "Use the English sentence to disambiguate the meaning. "
-    "Return a natural Russian translation for the clicked word matching its sentence context. "
-    "Keep the first letter capitalised if the source word is. "
+SINGLE_SYSTEM_RU_EN = (
+    "Translate the exact clicked Russian word into English only, not the surrounding words. "
+    "Use the Russian sentence and English WOL reference context to disambiguate the meaning. "
+    "If the clicked word is a single word token, return a single-word English translation if possible. "
+    "Do not translate a full phrase or a full name when the user clicked only one word. "
+    "Keep the answer natural English. Keep the first letter capitalised if the source word is. "
     "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.0-1.0}. "
     "If the translation is uncertain, return the original word rather than a broader phrase."
 )
@@ -67,9 +70,7 @@ def parse_response(text: str, allowed_ids: set[int], lang: str = "ru") -> dict[i
             i, es = int(r["id"]), str(r["es"]).strip()
         except (KeyError, TypeError, ValueError):
             continue
-        if i in allowed_ids and es and len(es) <= 60:
-            if lang != "en" and CYR.search(es):
-                continue
+        if i in allowed_ids and es and len(es) <= 60 and not CYR.search(es):
             out[i] = es
     return out
 
@@ -82,9 +83,7 @@ def parse_single_response(text: str, lang: str = "ru") -> str:
         if not isinstance(tr, str):
             raise TranslationError("translation field missing")
         tr = tr.strip()
-        if not tr or len(tr) > 60:
-            raise TranslationError("translation invalid")
-        if lang != "en" and CYR.search(tr):
+        if not tr or len(tr) > 60 or CYR.search(tr):
             raise TranslationError("translation invalid")
         return tr
     except (ValueError, TypeError, KeyError) as e:
@@ -104,7 +103,7 @@ class OpenRouterClient:
             "context": context,
             "spanish_reference": spanish_reference or "",
         }
-        system_prompt = SINGLE_SYSTEM_EN_RU if lang == "en" else SINGLE_SYSTEM_RU_ES
+        system_prompt = SINGLE_SYSTEM_RU_EN if lang == "en" else SINGLE_SYSTEM_RU_ES
         body = {
             "model": self.model,
             "temperature": 0.1,
@@ -149,7 +148,7 @@ class OpenRouterClient:
         user_content: dict = {"items": items}
         if spanish_reference:
             user_content["spanish_reference"] = spanish_reference
-        system_prompt = SYSTEM_EN_RU if lang == "en" else SYSTEM_RU_ES
+        system_prompt = SYSTEM_RU_EN if lang == "en" else SYSTEM_RU_ES
         body = {
             "model": self.model, "temperature": 0.1,
             "response_format": {"type": "json_object"},
