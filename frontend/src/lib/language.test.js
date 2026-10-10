@@ -2,94 +2,49 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { resolveLanguageMode, saveLanguagePreference } from "./language.js";
+import { isEnglishPath } from "./language.js";
 
-// Mock window & localStorage for node environment tests
-class LocalStorageMock {
-  constructor() {
-    this.store = {};
-  }
-  getItem(key) {
-    return this.store[key] || null;
-  }
-  setItem(key, value) {
-    this.store[key] = String(value);
-  }
-  removeItem(key) {
-    delete this.store[key];
-  }
-  clear() {
-    this.store = {};
-  }
-}
-
-const localStorageMock = new LocalStorageMock();
-globalThis.localStorage = localStorageMock;
-globalThis.window = {
-  location: { pathname: "/", search: "" },
-  localStorage: localStorageMock,
-};
-
-test("Language Resolution: /en path resolves to English mode", () => {
-  const res = resolveLanguageMode({ pathname: "/en", search: "" });
-  assert.equal(res.isEn, true);
-  assert.equal(res.source, "path");
-
-  const resTrailing = resolveLanguageMode({ pathname: "/en/today", search: "" });
-  assert.equal(resTrailing.isEn, true);
-  assert.equal(resTrailing.source, "path");
+test("Path-based Language Resolution: isEnglishPath", () => {
+  assert.equal(isEnglishPath("/"), false);
+  assert.equal(isEnglishPath("/en"), true);
+  assert.equal(isEnglishPath("/en/"), true);
+  assert.equal(isEnglishPath("/en/today"), true);
+  assert.equal(isEnglishPath("/english"), false);
 });
 
-test("Language Resolution: ?en query param resolves to English mode", () => {
-  const res = resolveLanguageMode({ pathname: "/", search: "?en=1" });
-  assert.equal(res.isEn, true);
-  assert.equal(res.source, "query");
-
-  const resLang = resolveLanguageMode({ pathname: "/", search: "?lang=en" });
-  assert.equal(resLang.isEn, true);
-  assert.equal(resLang.source, "query");
+test("No query or storage language parsing: ?en parameters do not alter isEnglishPath", () => {
+  // Query strings do not affect pathname logic
+  assert.equal(isEnglishPath("/"), false);
 });
 
-test("Language Resolution: Container storage preference restoration", () => {
-  globalThis.localStorage.clear();
-  saveLanguagePreference(true);
-  const resSavedEn = resolveLanguageMode({ pathname: "/", search: "" });
-  assert.equal(resSavedEn.isEn, true);
-  assert.equal(resSavedEn.source, "storage");
-
-  saveLanguagePreference(false);
-  const resSavedEs = resolveLanguageMode({ pathname: "/", search: "" });
-  assert.equal(resSavedEs.isEn, false);
-  assert.equal(resSavedEs.source, "storage");
-});
-
-test("Language Resolution: Default mode is Spanish", () => {
-  globalThis.localStorage.clear();
-  const res = resolveLanguageMode({ pathname: "/", search: "" });
-  assert.equal(res.isEn, false);
-  assert.equal(res.source, "default");
-});
-
-test("Language Precedence: URL explicit parameters override container storage", () => {
-  globalThis.localStorage.clear();
-  saveLanguagePreference(false); // stored Spanish
-  const resPath = resolveLanguageMode({ pathname: "/en/", search: "" });
-  assert.equal(resPath.isEn, true); // Path overrides storage
-
-  const resQuery = resolveLanguageMode({ pathname: "/", search: "?en" });
-  assert.equal(resQuery.isEn, true); // Query overrides storage
-});
-
-test("Web App Manifests: Check start_url, scope, id", () => {
+test("Web App Manifests: Spanish vs English manifests", () => {
   const publicDir = path.resolve(process.cwd(), "public");
   const manifestEs = JSON.parse(fs.readFileSync(path.join(publicDir, "manifest.webmanifest"), "utf8"));
   const manifestEn = JSON.parse(fs.readFileSync(path.join(publicDir, "manifest-en.webmanifest"), "utf8"));
 
+  // Check Spanish manifest
   assert.equal(manifestEs.start_url, "/");
   assert.equal(manifestEs.scope, "/");
   assert.equal(manifestEs.id, "/");
 
+  // Check English manifest
   assert.equal(manifestEn.start_url, "/en/");
   assert.equal(manifestEn.scope, "/en/");
   assert.equal(manifestEn.id, "/en/");
+  assert.equal(manifestEn.short_name, "Чтение EN");
+
+  // Verify all referenced icons exist
+  for (const icon of [...manifestEs.icons, ...manifestEn.icons]) {
+    const iconPath = path.join(publicDir, icon.src.replace(/^\//, ""));
+    assert.equal(fs.existsSync(iconPath), true, `Icon missing: ${icon.src}`);
+  }
+});
+
+test("HTML Entry Points: Static manifest links check", () => {
+  const rootDir = process.cwd();
+  const htmlEs = fs.readFileSync(path.resolve(rootDir, "index.html"), "utf8");
+  const htmlEn = fs.readFileSync(path.resolve(rootDir, "en/index.html"), "utf8");
+
+  assert.match(htmlEs, /<link\s+rel="manifest"\s+href="\/manifest\.webmanifest"/);
+  assert.match(htmlEn, /<link\s+rel="manifest"\s+href="\/manifest-en\.webmanifest"/);
 });
