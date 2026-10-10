@@ -47,10 +47,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
         response.headers["Cache-Control"] = "no-store"
         active_lang = _resolve_lang(lang, en)
         try:
-            if active_lang == "en":
-                content, notice = await daily.get_english(date)
-            else:
-                content, notice = await daily.get(date)
+            content, notice = await daily.get(date)
         except WolError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
         translations, status = tr.cached(content, lang=active_lang)
@@ -64,20 +61,19 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
         response.headers["Cache-Control"] = "no-store"
         active_lang = _resolve_lang(lang, en)
         try:
-            if active_lang == "en":
-                content, notice = await daily.get_english(date)
-            else:
-                content, notice = await daily.get(date)
+            content, notice = await daily.get(date)
         except WolError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
-        spanish_reference = ""
-        if active_lang != "en":
-            try:
-                spanish_content, _ = await daily.get_spanish(date or None)
-                spanish_reference = _flatten_daily_text(spanish_content)
-            except WolError:
-                spanish_reference = ""
-        translations, status = await tr.ensure(content, spanish_reference=spanish_reference, lang=active_lang)
+        ref_text = ""
+        try:
+            if active_lang == "en":
+                ref_content, _ = await daily.get_english(date or None)
+            else:
+                ref_content, _ = await daily.get_spanish(date or None)
+            ref_text = _flatten_daily_text(ref_content)
+        except WolError:
+            ref_text = ""
+        translations, status = await tr.ensure(content, spanish_reference=ref_text, lang=active_lang)
         return {"date": content["date"], "translations": {str(k): v for k, v in translations.items()},
                 "translations_status": status}
 
@@ -94,26 +90,25 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
             raise HTTPException(400, "word и sentence обязательны")
         active_lang = "en" if lang == "en" or payload.get("en") is not None else "ru"
         try:
-            if active_lang == "en":
-                content, _ = await daily.get_english(date or None)
-            else:
-                content, _ = await daily.get(date or None)
+            content, _ = await daily.get(date or None)
         except WolError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
-        spanish_reference = ""
-        if active_lang != "en":
-            try:
-                spanish_content, _ = await daily.get_spanish(date or None)
-                spanish_reference = _flatten_daily_text(spanish_content)
-            except WolError:
-                spanish_reference = ""
+        ref_text = ""
+        try:
+            if active_lang == "en":
+                ref_content, _ = await daily.get_english(date or None)
+            else:
+                ref_content, _ = await daily.get_spanish(date or None)
+            ref_text = _flatten_daily_text(ref_content)
+        except WolError:
+            ref_text = ""
         translated = await tr.translate_word(
             date=date or content["date"],
             word=word,
             lemma=lemma,
             sentence=sentence,
             context=context,
-            spanish_reference=spanish_reference,
+            spanish_reference=ref_text,
             lang=active_lang,
         )
         return {"original": word, "translation": translated}
