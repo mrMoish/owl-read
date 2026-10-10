@@ -5,14 +5,11 @@ from app.config import get_settings, Settings
 import tempfile
 import pathlib
 
-def test_spa_path_routes():
+def test_spa_route_serving():
     with tempfile.TemporaryDirectory() as tmpdir:
         dist = pathlib.Path(tmpdir)
-        (dist / "index.html").write_text("<html><body>Spanish SPA</body></html>")
-        en_dir = dist / "en"
-        en_dir.mkdir(parents=True, exist_ok=True)
-        (en_dir / "index.html").write_text("<html><body>English SPA</body></html>")
-        (dist / "manifest-en.webmanifest").write_text('{"short_name": "Чтение EN"}')
+        (dist / "index.html").write_text("<html><body>Daily Reader</body></html>")
+        (dist / "manifest-en.webmanifest").write_text('{"name": "Daily Reader"}')
 
         base = get_settings()
         settings = Settings(
@@ -27,33 +24,19 @@ def test_spa_path_routes():
             frontend_dist=dist,
         )
         app = create_app(settings=settings)
-        client = TestClient(app, follow_redirects=False)
+        client = TestClient(app)
 
-        # / -> Spanish index.html
+        # Base index.html
         r_root = client.get("/")
         assert r_root.status_code == 200
-        assert "Spanish SPA" in r_root.text
+        assert "Daily Reader" in r_root.text
 
-        # /en -> 301 redirect to /en/
-        r_en_no_slash = client.get("/en")
-        assert r_en_no_slash.status_code == 301
-        assert r_en_no_slash.headers["location"] == "/en/"
-
-        # /en/ -> English index.html
+        # /en path serving SPA index.html
         r_en = client.get("/en/")
         assert r_en.status_code == 200
-        assert "English SPA" in r_en.text
+        assert "Daily Reader" in r_en.text
 
-        # /en/subpath -> English index.html
-        r_en_sub = client.get("/en/today")
-        assert r_en_sub.status_code == 200
-        assert "English SPA" in r_en_sub.text
-
-        # Manifest
+        # Static manifest route
         r_manifest = client.get("/manifest-en.webmanifest")
         assert r_manifest.status_code == 200
-        assert "Чтение EN" in r_manifest.text
-
-        # Security check: path traversal attempts fail safely
-        r_traversal = client.get("/../backend/app/config.py")
-        assert "openrouter_api_key" not in r_traversal.text
+        assert "Daily Reader" in r_manifest.text

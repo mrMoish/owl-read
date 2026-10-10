@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from .config import Settings, get_settings
 from .daily import DailyService
 from .store import Store
@@ -116,13 +116,10 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
 
     if s.frontend_dist.exists():
         index_file = s.frontend_dist / "index.html"
-        en_index_file = s.frontend_dist / "en" / "index.html"
         dist_resolved = s.frontend_dist.resolve()
 
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str):
-            if full_path == "en":
-                return RedirectResponse(url="/en/", status_code=301)
             if full_path:
                 try:
                     resolved_file = (s.frontend_dist / full_path).resolve()
@@ -130,9 +127,6 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
                         return FileResponse(resolved_file)
                 except (ValueError, Exception):
                     pass
-            if full_path.startswith("en/") or full_path == "en/":
-                if en_index_file.is_file():
-                    return FileResponse(en_index_file)
             if index_file.is_file():
                 return FileResponse(index_file)
             raise HTTPException(404, "Not Found")
