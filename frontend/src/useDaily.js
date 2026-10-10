@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDaily, requestTranslations } from "./api.js";
-import { loadDaily, localDate, saveDaily, resolveLanguageMode } from "./lib/storage.js";
+import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
 import { initialData, offlineState } from "./lib/offline.js";
 
 export function isEnglishMode() {
-  return resolveLanguageMode() === "en";
+  if (typeof window !== "undefined" && window.location?.search) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("en") || params.get("lang") === "en") return true;
+  }
+  return false;
 }
 
 function activeDate() {

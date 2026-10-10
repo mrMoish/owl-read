@@ -80,35 +80,3 @@ export const saveDaily = (d, lang = "ru") => safe(() => {
   const key = lang === "en" ? "reader.daily.en" : "reader.daily";
   localStorage.setItem(key, JSON.stringify(d));
 });
-
-const LANG_KEY = "reader.lang";
-
-export const loadLanguagePreference = () => safe(() => {
-  return localStorage.getItem(LANG_KEY) || null;
-}, null);
-
-export const saveLanguagePreference = (lang) => safe(() => {
-  if (lang) {
-    localStorage.setItem(LANG_KEY, lang);
-  } else {
-    localStorage.removeItem(LANG_KEY);
-  }
-});
-
-export const resolveLanguageMode = () => {
-  if (typeof window !== "undefined" && window.location?.search) {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("en") || params.get("lang") === "en") {
-      saveLanguagePreference("en");
-      return "en";
-    }
-    if (params.has("es") || params.get("lang") === "es" || params.get("lang") === "ru") {
-      saveLanguagePreference("es");
-      return "es";
-    }
-  }
-  const saved = loadLanguagePreference();
-  if (saved === "en") return "en";
-  if (saved === "es") return "es";
-  return "es";
-};
