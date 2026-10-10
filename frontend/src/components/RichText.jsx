@@ -61,7 +61,7 @@ function Node({ node, index, translations, onWordClick, meta, registerRef }) {
   return <>{children}</>;
 }
 
-export default function RichText({ nodes = [], translations = {}, onWordClick = () => {}, meta = {} }) {
+export default function RichText({ nodes = [], translations = {}, onWordClick = () => {}, meta = {}, lang = "es" }) {
   const wordRefs = useRef({});
   const prevRects = useRef({});
 
@@ -73,7 +73,7 @@ export default function RichText({ nodes = [], translations = {}, onWordClick = 
     }
   };
 
-  const reordered = reorderNodes(nodes, translations, meta);
+  const reordered = reorderNodes(nodes, translations, meta, lang);
 
   useLayoutEffect(() => {
     const currentRects = {};
