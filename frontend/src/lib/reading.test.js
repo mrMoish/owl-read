@@ -275,17 +275,20 @@ test("11. Перестановка порядка слов для сочетан
     "1": { w: "группа", lemma: "группа", pos: "NOUN" },
   };
 
-  // Без перевода второго слова порядок сохраняется
-  const untranslated = reorderNodes(nodes, {}, meta);
-  assert.equal(untranslated[1].id, 0);
-  assert.equal(untranslated[3].id, 1);
+  // 1. Когда переведено только второе слово («группа» -> «grupo»), перестановки ЕЩЁ нет
+  const nounOnlyTranslations = { "1": "grupo" };
+  assert.equal(shouldSwapPair(nodes[1], nodes[3], nounOnlyTranslations, meta), false);
 
-  // Когда второе слово переведено («группа» -> «grupo»), порядок визуально меняется
-  const translations = { "1": "grupo" };
-  assert.equal(shouldSwapPair(nodes[1], nodes[3], translations, meta), true);
+  const nounOnlyReordered = reorderNodes(nodes, nounOnlyTranslations, meta);
+  assert.equal(nounOnlyReordered[1].id, 0);
+  assert.equal(nounOnlyReordered[3].id, 1);
 
-  const reordered = reorderNodes(nodes, translations, meta);
-  // Первым становится узел id 1 («группа»), затем пробел, затем узел id 0 («маленькая»)
+  // 2. Когда переведены ОБА слова («маленькая» -> «pequeña», «группа» -> «grupo»), слова меняются местами
+  const bothTranslations = { "0": "pequeña", "1": "grupo" };
+  assert.equal(shouldSwapPair(nodes[1], nodes[3], bothTranslations, meta), true);
+
+  const reordered = reorderNodes(nodes, bothTranslations, meta);
+  // Первым становится узел id 1 («grupo»), затем пробел, затем узел id 0 («pequeña»)
   assert.equal(reordered[1].id, 1);
   assert.equal(reordered[3].id, 0);
 });
