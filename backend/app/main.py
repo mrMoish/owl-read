@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from .config import Settings, get_settings
 from .daily import DailyService
 from .store import Store
@@ -114,7 +115,22 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
         return {"original": word, "translation": translated}
 
     if s.frontend_dist.exists():
-        app.mount("/", StaticFiles(directory=s.frontend_dist, html=True), name="web")
+        index_file = s.frontend_dist / "index.html"
+        dist_resolved = s.frontend_dist.resolve()
+
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str):
+            if full_path:
+                try:
+                    resolved_file = (s.frontend_dist / full_path).resolve()
+                    if resolved_file.is_relative_to(dist_resolved) and resolved_file.is_file():
+                        return FileResponse(resolved_file)
+                except (ValueError, Exception):
+                    pass
+            if index_file.is_file():
+                return FileResponse(index_file)
+            raise HTTPException(404, "Not Found")
+
     return app
 
 
