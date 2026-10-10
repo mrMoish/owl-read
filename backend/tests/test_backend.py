@@ -194,9 +194,9 @@ def test_custom_date_query_param(tmp_path):
 
 
 def test_english_mode_support(tmp_path):
-    """Проверяет работу английского режима через ?en и ?lang=en (русский текст в основе, английский как справка)."""
+    """Проверяет работу английского режима через ?en и ?lang=en (английский текст с WOL в основе, русский как справка для перевода)."""
     en_page = """<html><body><div class="todayItems">
-<div class="todayItem"><header><h2>Thursday, October 8</h2></header>
+<div class="todayItem"><header><h2>Tuesday, October 6</h2></header>
 <p><em>«I have seen the Lord!» (<a href="/en/wol/bc/1">John 20:18</a>).</em></p>
 <p>Mary Magdalene came and brought the news to the disciples. <a href="/pc/1"><em>w24.10</em> 13</a></p>
 <p><a href="/d/1">Examining the Scriptures Daily—2026</a></p></div>
@@ -208,15 +208,38 @@ def test_english_mode_support(tmp_path):
     async def fetch_ru(base, day):
         return page_for(day)
 
-    s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="")
-    app = create_app(s, fetch=fetch_ru, fetch_english=fetch_en)
-    c = TestClient(app)
+    captured = {}
+    def handler(request):
+        payload = json.loads(json.loads(request.content)["messages"][1]["content"])
+        items = payload["items"]
+        captured["spanish_ref"] = payload.get("spanish_reference", "")
+        rows = [{"id": i["id"], "es": "ученики" if i["word"] == "disciples" else "новость"} for i in items]
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
 
-    # Проверяем получение ежедневного материала на русском языке через ?en=1
-    r = c.get("/api/daily?date=2026-10-06&en=1").json()
-    assert r["date_label"] == "X, 6 октября"
-    assert any(m["w"] == "Христианам" for m in r["meta"].values())
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    orig = o.OpenRouterClient.__init__
+    def init(self, k, m, h=None): orig(self, k, m, http)
+    o.OpenRouterClient.__init__ = init
+    try:
+        s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="key")
+        app = create_app(s, fetch=fetch_ru, fetch_english=fetch_en)
+        c = TestClient(app)
 
-    # Проверяем также через ?lang=en
-    r2 = c.get("/api/daily?date=2026-10-06&lang=en").json()
-    assert r2["date_label"] == "X, 6 октября"
+        # Проверяем получение ежедневного материала на английском языке через ?en=1
+        r = c.get("/api/daily?date=2026-10-06&en=1").json()
+        assert r["date_label"] == "Tuesday, October 6"
+        assert any(m["w"] == "disciples" for m in r["meta"].values())
+
+        # Проверяем также через ?lang=en
+        r2 = c.get("/api/daily?date=2026-10-06&lang=en").json()
+        assert r2["date_label"] == "Tuesday, October 6"
+
+        # Вызываем подготовку переводов на русский язык
+        tr_resp = c.post("/api/daily/translations?date=2026-10-06&en=1").json()
+        assert tr_resp["translations_status"] == "ready"
+        assert "ученики" in tr_resp["translations"].values()
+        # В качестве подсказки передан русский текст из русской страницы WOL
+        assert "Христианам" in captured["spanish_ref"]
+    finally:
+        o.OpenRouterClient.__init__ = orig
