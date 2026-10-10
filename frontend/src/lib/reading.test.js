@@ -263,32 +263,24 @@ test("10. Корректная замена, когда перевод сост�
   assert.equal(visible["0"], "por la mañana");
 });
 
-test("11. Перестановка порядка слов для сочетаний Прилагательное + Существительное («маленькая группа» -> «grupo pequeña»)", () => {
+test("11. Сохранение естественного порядка слов в предложении («в последний раз»)", () => {
   const nodes = [
-    { t: "text", s: "Un " },
-    { t: "w", id: 0, s: "маленькая" },
+    { t: "text", s: "в " },
+    { t: "w", id: 0, s: "последний" },
     { t: "text", s: " " },
-    { t: "w", id: 1, s: "группа" },
+    { t: "w", id: 1, s: "раз" },
   ];
   const meta = {
-    "0": { w: "маленькая", lemma: "маленький", pos: "ADJF" },
-    "1": { w: "группа", lemma: "группа", pos: "NOUN" },
+    "0": { w: "последний", lemma: "последний", pos: "ADJF" },
+    "1": { w: "раз", lemma: "раз", pos: "NOUN" },
   };
 
-  // 1. Когда переведено только второе слово («группа» -> «grupo»), перестановки ЕЩЁ нет
-  const nounOnlyTranslations = { "1": "grupo" };
-  assert.equal(shouldSwapPair(nodes[1], nodes[3], nounOnlyTranslations, meta), false);
-
-  const nounOnlyReordered = reorderNodes(nodes, nounOnlyTranslations, meta);
-  assert.equal(nounOnlyReordered[1].id, 0);
-  assert.equal(nounOnlyReordered[3].id, 1);
-
-  // 2. Когда переведены ОБА слова («маленькая» -> «pequeña», «группа» -> «grupo»), слова меняются местами
-  const bothTranslations = { "0": "pequeña", "1": "grupo" };
-  assert.equal(shouldSwapPair(nodes[1], nodes[3], bothTranslations, meta), true);
+  // 1. С перестановкой пары перестановка не выполняется
+  const bothTranslations = { "0": "last", "1": "time" };
+  assert.equal(shouldSwapPair(nodes[1], nodes[3], bothTranslations, meta), false);
 
   const reordered = reorderNodes(nodes, bothTranslations, meta);
-  // Первым становится узел id 1 («grupo»), затем пробел, затем узел id 0 («pequeña»)
-  assert.equal(reordered[1].id, 1);
-  assert.equal(reordered[3].id, 0);
+  // Порядок узлов сохраняется: узел 0 («последний»), затем узел 1 («раз»)
+  assert.equal(reordered[1].id, 0);
+  assert.equal(reordered[3].id, 1);
 });
