@@ -31,10 +31,19 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
                          fetch_spanish=fetch_spanish or (lambda base, day, client=None: fetch_wol_page(base, day, client=client, language="es")),
                          fetch_english=fetch_english or (lambda base, day, client=None: fetch_wol_page(base, day, client=client, language="en")))
     app = FastAPI(title="Daily Reader")
-    origins = [o.strip().rstrip("/") for o in __import__("os").environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
-    if origins:
-        app.add_middleware(CORSMiddleware, allow_origins=origins,
-                           allow_methods=["GET", "POST"], allow_headers=["*"])
+    origins = [
+        o.strip().rstrip("/")
+        for o in __import__("os").environ.get("ALLOWED_ORIGINS", "").split(",")
+        if o.strip()
+    ]
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_origin_regex=r"https://owl-read(?:-[a-z0-9]+)*-mrmoishs-projects\.vercel\.app",
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
 
     @app.get("/api/health")
     def health():
