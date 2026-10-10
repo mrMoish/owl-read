@@ -10,15 +10,15 @@ LANG = "es-AR"
 CHUNK = 40
 
 
-def cache_key(*parts):
-    """Составной cache key: current date + word + sentence + language.
-    Поддерживает старый вызов cache_key(word, sentence) для совместимости."""
+def cache_key(*parts, lang: str = "ru"):
+    """Составной cache key: current date + word + sentence + language."""
     if len(parts) == 2:
         word, sentence = parts
         date = ""
     else:
         date, word, sentence = parts
-    text = f"v2|{date}|{LANG}|{word.lower()}|{sentence}"
+    lang_tag = "en-RU" if lang == "en" else LANG
+    text = f"v2|{date}|{lang_tag}|{word.lower()}|{sentence}"
     return hashlib.sha1(text.encode("utf-8")).hexdigest()
 
 
@@ -30,20 +30,20 @@ class TranslationService:
         order = content.get("order", [])
         return list(order) if order else [int(k) for k in content.get("meta", {}).keys()]
 
-    def _lookup(self, content: dict):
+    def _lookup(self, content: dict, lang: str = "ru"):
         ids = self._needed(content)
-        keys = {i: cache_key(content["date"], content["meta"][str(i)]["w"], content["meta"][str(i)]["sent"]) for i in ids}
+        keys = {i: cache_key(content["date"], content["meta"][str(i)]["w"], content["meta"][str(i)]["sent"], lang=lang) for i in ids}
         hit = self.store.get_translations(list(keys.values()))
         return ids, keys, {i: hit[k] for i, k in keys.items() if k in hit}
 
-    def cached(self, content: dict):
-        ids, _, tr = self._lookup(content)
+    def cached(self, content: dict, lang: str = "ru"):
+        ids, _, tr = self._lookup(content, lang=lang)
         if len(tr) == len(ids):
             return tr, "ready"
         return tr, ("pending" if self.client else "unavailable")
 
-    async def ensure(self, content: dict, spanish_reference: str = ""):
-        ids, keys, tr = self._lookup(content)
+    async def ensure(self, content: dict, spanish_reference: str = "", lang: str = "ru"):
+        ids, keys, tr = self._lookup(content, lang=lang)
         missing = [i for i in ids if i not in tr]
         if not missing:
             return tr, "ready"
@@ -56,7 +56,7 @@ class TranslationService:
                       "lemma": content["meta"][str(i)]["lemma"],
                       "sentence": content["meta"][str(i)]["sent"]} for i in part]
             async with sem:
-                return await self.client.translate_batch(items, spanish_reference=spanish_reference)
+                return await self.client.translate_batch(items, spanish_reference=spanish_reference, lang=lang)
 
         parts = [missing[i:i + CHUNK] for i in range(0, len(missing), CHUNK)]
         results = await asyncio.gather(*(run(p) for p in parts), return_exceptions=True)
@@ -73,10 +73,10 @@ class TranslationService:
             tr.update(new)
         return tr, ("ready" if len(tr) == len(ids) else "partial")
 
-    async def translate_word(self, *, date: str, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None):
+    async def translate_word(self, *, date: str, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None, lang: str = "ru"):
         if not word or not sentence:
             return word
-        key = cache_key(date, word, sentence)
+        key = cache_key(date, word, sentence, lang=lang)
         previous = self.store.get_translations([key])
         if key in previous:
             return previous[key]
@@ -89,6 +89,7 @@ class TranslationService:
                 sentence=sentence,
                 context=context,
                 spanish_reference=spanish_reference,
+                lang=lang,
             )
         except TranslationError as e:
             log.warning("translate_word failed: %s", e)

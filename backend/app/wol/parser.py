@@ -15,8 +15,11 @@ MONTHS = ["января", "февраля", "марта", "апреля", "ма�
           "сентября", "октября", "ноября", "декабря"]
 ES_MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
              "septiembre", "octubre", "noviembre", "diciembre"]
+EN_MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august",
+             "september", "october", "november", "december"]
 STOP_PREFIXES = ("добро пожаловать", "поделиться", "это онлайн-библиотека",
-                 "bienvenido", "compartir", "esta es una biblioteca")
+                 "bienvenido", "compartir", "esta es una biblioteca",
+                 "welcome", "share", "this is a research tool")
 
 
 def _clean(s: str) -> str:
@@ -85,8 +88,13 @@ def parse_wol_page(html: str, day: date, base: str = "https://wol.jw.org") -> di
     soup = BeautifulSoup(html, "html.parser")
     ru_label = f"{day.day} {MONTHS[day.month - 1]}"
     es_label = f"{day.day} de {ES_MONTHS[day.month - 1]}"
+    en_label_1 = f"{EN_MONTHS[day.month - 1]} {day.day}"
+    en_label_2 = f"{day.day} {EN_MONTHS[day.month - 1]}"
     heading = next((h for h in soup.find_all("h2")
-                    if ru_label in _clean(h.get_text()).lower() or es_label in _clean(h.get_text()).lower()), None)
+                    if ru_label in _clean(h.get_text()).lower() or
+                       es_label in _clean(h.get_text()).lower() or
+                       en_label_1 in _clean(h.get_text()).lower() or
+                       en_label_2 in _clean(h.get_text()).lower()), None)
     if heading is None:
         raise WolError(f"На странице нет материала за {ru_label} (разметка изменилась или дата недоступна)")
 

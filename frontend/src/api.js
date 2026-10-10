@@ -4,8 +4,16 @@ async function j(path, opts) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
-export const fetchDaily = (date) => j(`/api/daily?date=${date}`);
-export const requestTranslations = (date) => j(`/api/daily/translations?date=${date}`, { method: "POST" });
+export const fetchDaily = (date, isEn = false) => {
+  const query = isEn ? `date=${date}&en=1` : `date=${date}`;
+  return j(`/api/daily?${query}`);
+};
+
+export const requestTranslations = (date, isEn = false) => {
+  const query = isEn ? `date=${date}&en=1` : `date=${date}`;
+  return j(`/api/daily/translations?${query}`, { method: "POST" });
+};
+
 export const translateWord = (payload) => j(`/api/translate`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },

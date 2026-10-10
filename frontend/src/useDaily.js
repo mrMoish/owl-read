@@ -3,6 +3,14 @@ import { fetchDaily, requestTranslations } from "./api.js";
 import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
 import { initialData, offlineState } from "./lib/offline.js";
 
+export function isEnglishMode() {
+  if (typeof window !== "undefined" && window.location?.search) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("en") || params.get("lang") === "en") return true;
+  }
+  return false;
+}
+
 function activeDate() {
   if (typeof window !== "undefined" && window.location?.search) {
     const q = new URLSearchParams(window.location.search).get("date");
@@ -13,10 +21,11 @@ function activeDate() {
 
 /** При каждом запуске грузит материал дня и заранее подготавливает переводы. */
 export function useDaily() {
+  const isEn = isEnglishMode();
   const [state, setState] = useState(() => {
-    const cached = loadDaily();
+    const cached = loadDaily(isEn ? "en" : "ru");
     const target = activeDate();
-    return { data: initialData(cached, target), loading: true, error: null, notice: null };
+    return { data: initialData(cached, target), loading: true, error: null, notice: null, isEn };
   });
   const busy = useRef(false);
 
@@ -24,20 +33,21 @@ export function useDaily() {
     if (busy.current) return;
     busy.current = true;
     const date = activeDate();
+    const langKey = isEn ? "en" : "ru";
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      let data = await fetchDaily(date);
-      saveDaily(data);
-      setState({ data, loading: false, error: null, notice: data.notice });
+      let data = await fetchDaily(date, isEn);
+      saveDaily(data, langKey);
+      setState({ data, loading: false, error: null, notice: data.notice, isEn });
       if (data.translations_status === "pending" || data.translations_status === "partial") {
         try {
-          const t = await requestTranslations(date);
+          const t = await requestTranslations(date, isEn);
           data = {
             ...data,
             translations: { ...(data.translations || {}), ...(t.translations || {}) },
             translations_status: t.translations_status,
           };
-          saveDaily(data);
+          saveDaily(data, langKey);
           setState((s) => ({ ...s, data }));
         } catch {
           // Если фоновый перевод не удался, слова останутся на русском
@@ -47,10 +57,10 @@ export function useDaily() {
       // Сети нет: показываем сохранённый выпуск любой даты — обязательно с пометкой
       setState((s) => ({
         ...s, loading: false,
-        ...offlineState({ shownData: s.data, cached: loadDaily(), targetDate: date }),
+        ...offlineState({ shownData: s.data, cached: loadDaily(langKey), targetDate: date }),
       }));
     } finally { busy.current = false; }
-  }, []);
+  }, [isEn]);
 
   useEffect(() => {
     load();

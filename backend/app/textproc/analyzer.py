@@ -11,6 +11,7 @@ from functools import lru_cache
 import pymorphy3
 
 WORD_RE = re.compile(r"[А-Яа-яЁё]+(?:-[А-Яа-яЁё]+)*")
+EN_WORD_RE = re.compile(r"[A-Za-z]+(?:-[A-Za-z]+)*")
 SENT_RE = re.compile(r"(?<=[.!?…])[»\"\)]*\s+(?=[«\"—А-ЯЁA-Z])")
 
 
@@ -19,12 +20,14 @@ def _morph() -> pymorphy3.MorphAnalyzer:
     return pymorphy3.MorphAnalyzer()
 
 
-def judge(word: str, first_in_sentence: bool):
-    """Любое обычное русское слово интерактивно."""
+def judge(word: str, first_in_sentence: bool, lang: str = "ru"):
+    """Любое обычное слово интерактивно."""
     if not word or len(word) < 1:
         return None
     if len(word) > 1 and word.isupper():
         return None
+    if lang == "en":
+        return (word.lower(), "EN")
     parses = _morph().parse(word.lower())
     if not parses:
         return None
@@ -65,11 +68,12 @@ def _merge(nodes):
     return out
 
 
-def analyze_blocks(blocks: list[dict], start_id: int = 0):
+def analyze_blocks(blocks: list[dict], start_id: int = 0, lang: str = "ru"):
     """-> (новые блоки, meta {id: {w, lemma, sent}}, next_id)"""
     meta: dict[int, dict] = {}
     nid = start_id
     out_blocks = []
+    word_re = EN_WORD_RE if lang == "en" else WORD_RE
     for blk in blocks:
         ctx = _Ctx(_plain(blk["nodes"]))
 
@@ -81,12 +85,12 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0):
                     res.append({**n, "c": walk(n.get("c", []), in_link or n["t"] == "a")})
                     continue
                 s, base, last = n["s"], ctx.pos, 0
-                for m in WORD_RE.finditer(s):
+                for m in word_re.finditer(s):
                     j = None
                     if not in_link:
                         sstart, sent = ctx.sentence(base + m.start())
                         first = not re.search(r"\w", ctx.plain[sstart:base + m.start()])
-                        j = judge(m.group(), first)
+                        j = judge(m.group(), first, lang=lang)
                     if j:
                         if m.start() > last:
                             res.append({"t": "text", "s": s[last:m.start()]})

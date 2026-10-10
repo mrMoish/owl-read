@@ -71,5 +71,12 @@ export const localDate = (now = new Date()) => {
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 };
 
-export const loadDaily = () => safe(() => JSON.parse(localStorage.getItem("reader.daily") || "null"), null);
-export const saveDaily = (d) => safe(() => localStorage.setItem("reader.daily", JSON.stringify(d)));
+export const loadDaily = (lang = "ru") => safe(() => {
+  const key = lang === "en" ? "reader.daily.en" : "reader.daily";
+  return JSON.parse(localStorage.getItem(key) || "null");
+}, null);
+
+export const saveDaily = (d, lang = "ru") => safe(() => {
+  const key = lang === "en" ? "reader.daily.en" : "reader.daily";
+  localStorage.setItem(key, JSON.stringify(d));
+});

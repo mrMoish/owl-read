@@ -30,8 +30,10 @@ function articleContext(data) {
   return blocks.map((block) => flattenText(block.nodes || [])).join(" ");
 }
 
+import { isEnglishMode } from "./useDaily.js";
+
 export default function App() {
-  const { data, loading, error, notice, reload } = useDaily();
+  const { data, loading, error, notice, reload, isEn } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
   const [manualTranslations, setManualTranslations] = useState({});
 
@@ -64,7 +66,7 @@ export default function App() {
     const isCurrentlyTranslated = Boolean(visibleTranslations[key]);
 
     if (isCurrentlyTranslated) {
-      // Пользователь нажал на переведённое слово -> сброс слова и его словоформ на русский
+      // Пользователь нажал на переведённое слово -> сброс слова и его словоформ
       const nextLearned = removeLearnedWord(normLemma);
       setLearnedWords(nextLearned || {});
 
@@ -90,11 +92,12 @@ export default function App() {
           sentence,
           context: context || articleContext(data),
           date: data.date,
+          lang: isEn ? "en" : "ru",
         };
         const res = await translateWord(payload);
         translated = res?.translation || res?.original || word;
       } catch {
-        // Ошибка перевода не ломает UX. Исходное слово остаётся на русском.
+        // Ошибка перевода не ломает UX.
       }
     }
 

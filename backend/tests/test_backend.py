@@ -191,3 +191,30 @@ def test_custom_date_query_param(tmp_path):
 
     r3 = c.get(f"/api/daily?date={d3}").json()
     assert r3["date"] == "2026-10-08"
+
+
+def test_english_mode_support(tmp_path):
+    """Проверяет работу английского режима через ?en и ?lang=en."""
+    en_page = """<html><body><div class="todayItems">
+<div class="todayItem"><header><h2>Thursday, October 8</h2></header>
+<p><em>«I have seen the Lord!» (<a href="/en/wol/bc/1">John 20:18</a>).</em></p>
+<p>Mary Magdalene came and brought the news to the disciples. <a href="/pc/1"><em>w24.10</em> 13</a></p>
+<p><a href="/d/1">Examining the Scriptures Daily—2026</a></p></div>
+</div></body></html>"""
+
+    async def fetch_en(base, day):
+        return en_page
+
+    s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="")
+    app = create_app(s, fetch_english=fetch_en)
+    c = TestClient(app)
+
+    # Проверяем получение ежедневного материала на английском через ?en=1
+    r = c.get("/api/daily?date=2026-10-08&en=1").json()
+    assert r["date_label"] == "Thursday, October 8"
+    assert any(m["w"] == "Mary" for m in r["meta"].values())
+    assert any(m["w"] == "disciples" for m in r["meta"].values())
+
+    # Проверяем также через ?lang=en
+    r2 = c.get("/api/daily?date=2026-10-08&lang=en").json()
+    assert r2["date_label"] == "Thursday, October 8"
