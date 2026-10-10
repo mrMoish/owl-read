@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDaily, requestTranslations } from "./api.js";
 import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
 import { initialData, offlineState } from "./lib/offline.js";
-import { resolveLanguageMode, saveLanguagePreference } from "./lib/language.js";
+import { isEnglishPath } from "./lib/language.js";
 
 export function isEnglishMode() {
-  return resolveLanguageMode().isEn;
+  if (typeof window !== "undefined" && window.location?.pathname) {
+    return isEnglishPath(window.location.pathname);
+  }
+  return false;
 }
 
 function activeDate() {
@@ -18,17 +21,11 @@ function activeDate() {
 
 /** При каждом запуске грузит материал дня и заранее подготавливает переводы. */
 export function useDaily() {
-  const langRes = resolveLanguageMode();
-  const isEn = langRes.isEn;
-  const langSource = langRes.source;
-
-  // Persist language mode into local container storage on load
-  saveLanguagePreference(isEn);
-
+  const isEn = isEnglishMode();
   const [state, setState] = useState(() => {
     const cached = loadDaily(isEn ? "en" : "ru");
     const target = activeDate();
-    return { data: initialData(cached, target), loading: true, error: null, notice: null, isEn, langSource };
+    return { data: initialData(cached, target), loading: true, error: null, notice: null, isEn };
   });
   const busy = useRef(false);
 
@@ -41,7 +38,7 @@ export function useDaily() {
     try {
       let data = await fetchDaily(date, isEn);
       saveDaily(data, langKey);
-      setState({ data, loading: false, error: null, notice: data.notice, isEn, langSource });
+      setState({ data, loading: false, error: null, notice: data.notice, isEn });
       if (data.translations_status === "pending" || data.translations_status === "partial") {
         try {
           const t = await requestTranslations(date, isEn);
@@ -63,7 +60,7 @@ export function useDaily() {
         ...offlineState({ shownData: s.data, cached: loadDaily(langKey), targetDate: date }),
       }));
     } finally { busy.current = false; }
-  }, [isEn, langSource]);
+  }, [isEn]);
 
   useEffect(() => {
     load();
