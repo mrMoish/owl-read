@@ -263,7 +263,61 @@ test("10. Корректная замена, когда перевод сост�
   assert.equal(visible["0"], "por la mañana");
 });
 
-test("11. Сохранение естественного порядка слов в предложении («в последний раз»)", () => {
+// --- Новые обязательные лингвистические тесты перестановки порядка слов (п. 8) ---
+
+test("Requirement 1: Russian -> Spanish: «маленькая группа» -> «grupo pequeño»", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "маленькая" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "группа" },
+  ];
+  const meta = {
+    "0": { w: "маленькая", lemma: "маленький", pos: "ADJF" },
+    "1": { w: "группа", lemma: "группа", pos: "NOUN" },
+  };
+  const translations = { "0": "pequeño", "1": "grupo" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "1"); // «группа» -> «grupo»
+  assert.equal(String(res[2].id), "0"); // «маленькая» -> «pequeño»
+});
+
+test("Requirement 2: Russian -> English: «маленькая группа» -> «small group»", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "маленькая" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "группа" },
+  ];
+  const meta = {
+    "0": { w: "маленькая", lemma: "маленький", pos: "ADJF" },
+    "1": { w: "группа", lemma: "группа", pos: "NOUN" },
+  };
+  const translations = { "0": "small", "1": "group" };
+
+  const res = reorderNodes(nodes, translations, meta, "en");
+  assert.equal(String(res[0].id), "0"); // «small»
+  assert.equal(String(res[2].id), "1"); // «group»
+});
+
+test("Requirement 3: Russian -> Spanish: «в последний раз» -> «por última vez» (no swap)", () => {
+  const nodes = [
+    { t: "text", s: "в " },
+    { t: "w", id: 0, s: "последний" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "раз" },
+  ];
+  const meta = {
+    "0": { w: "последний", lemma: "последний", pos: "ADJF", sent: "в последний раз" },
+    "1": { w: "раз", lemma: "раз", pos: "NOUN", sent: "в последний раз" },
+  };
+  const translations = { "0": "última", "1": "vez" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[1].id), "0"); // «última»
+  assert.equal(String(res[3].id), "1"); // «vez»
+});
+
+test("Requirement 4: Russian -> English: «в последний раз» -> «for the last time» (no swap)", () => {
   const nodes = [
     { t: "text", s: "в " },
     { t: "w", id: 0, s: "последний" },
@@ -274,13 +328,232 @@ test("11. Сохранение естественного порядка сло�
     "0": { w: "последний", lemma: "последний", pos: "ADJF" },
     "1": { w: "раз", lemma: "раз", pos: "NOUN" },
   };
+  const translations = { "0": "last", "1": "time" };
 
-  // 1. С перестановкой пары перестановка не выполняется
-  const bothTranslations = { "0": "last", "1": "time" };
-  assert.equal(shouldSwapPair(nodes[1], nodes[3], bothTranslations, meta), false);
+  const res = reorderNodes(nodes, translations, meta, "en");
+  assert.equal(String(res[1].id), "0");
+  assert.equal(String(res[3].id), "1");
+});
 
-  const reordered = reorderNodes(nodes, bothTranslations, meta);
-  // Порядок узлов сохраняется: узел 0 («последний»), затем узел 1 («раз»)
-  assert.equal(reordered[1].id, 0);
-  assert.equal(reordered[3].id, 1);
+test("Requirement 5: Russian -> Spanish: «интересная книга» -> «libro interesante»", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "интересная" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "книга" },
+  ];
+  const meta = {
+    "0": { w: "интересная", lemma: "интересный", pos: "ADJF" },
+    "1": { w: "книга", lemma: "книга", pos: "NOUN" },
+  };
+  const translations = { "0": "interesante", "1": "libro" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "1"); // libro
+  assert.equal(String(res[2].id), "0"); // интересная
+});
+
+test("Requirement 6: Russian -> English: «интересная книга» -> «interesting book»", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "интересная" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "книга" },
+  ];
+  const meta = {
+    "0": { w: "интересная", lemma: "интересный", pos: "ADJF" },
+    "1": { w: "книга", lemma: "книга", pos: "NOUN" },
+  };
+  const translations = { "0": "interesting", "1": "book" };
+
+  const res = reorderNodes(nodes, translations, meta, "en");
+  assert.equal(String(res[0].id), "0");
+  assert.equal(String(res[2].id), "1");
+});
+
+test("Requirement 7: Russian -> Spanish: «большая проблема» -> «gran проблема» (no swap)", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "большая" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "проблема" },
+  ];
+  const meta = {
+    "0": { w: "большая", lemma: "большой", pos: "ADJF" },
+    "1": { w: "проблема", lemma: "проблема", pos: "NOUN" },
+  };
+  const translations = { "0": "gran", "1": "problema" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "0"); // gran
+  assert.equal(String(res[2].id), "1"); // проблема
+});
+
+test("Requirement 8: Phrase that should remain in original order", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "читать" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "книгу" },
+  ];
+  const meta = {
+    "0": { w: "читать", lemma: "читать", pos: "INFN" },
+    "1": { w: "книгу", lemma: "книга", pos: "NOUN" },
+  };
+  const translations = { "0": "leer", "1": "el libro" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "0");
+  assert.equal(String(res[2].id), "1");
+});
+
+test("Requirement 9: Phrase with punctuation preserves punctuation text", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "красивая" },
+    { t: "text", s: ", " },
+    { t: "w", id: 1, s: "птица" },
+  ];
+  const meta = {
+    "0": { w: "красивая", lemma: "красивый", pos: "ADJF" },
+    "1": { w: "птица", lemma: "птица", pos: "NOUN" },
+  };
+  const translations = { "0": "hermosa", "1": "ave" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "1");
+  assert.equal(res[1].s, ", ");
+  assert.equal(String(res[2].id), "0");
+});
+
+test("Requirement 10: Phrase containing nested formatted nodes", () => {
+  const nodes = [
+    {
+      t: "em",
+      c: [
+        { t: "w", id: 0, s: "маленькая" },
+        { t: "text", s: " " },
+        { t: "w", id: 1, s: "группа" },
+      ],
+    },
+  ];
+  const meta = {
+    "0": { w: "маленькая", lemma: "маленький", pos: "ADJF" },
+    "1": { w: "группа", lemma: "группа", pos: "NOUN" },
+  };
+  const translations = { "0": "pequeño", "1": "grupo" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  const children = res[0].c;
+  assert.equal(String(children[0].id), "1");
+  assert.equal(String(children[2].id), "0");
+});
+
+test("Requirement 11: Repeated occurrences of same word with different IDs", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "новое" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "слово" },
+    { t: "text", s: " и " },
+    { t: "w", id: 2, s: "новое" },
+    { t: "text", s: " " },
+    { t: "w", id: 3, s: "дело" },
+  ];
+  const meta = {
+    "0": { w: "новое", lemma: "новый", pos: "ADJF" },
+    "1": { w: "слово", lemma: "слово", pos: "NOUN" },
+    "2": { w: "новое", lemma: "новый", pos: "ADJF" },
+    "3": { w: "дело", lemma: "дело", pos: "NOUN" },
+  };
+  // "новый" - pre-noun adj in ES exception list -> no swap
+  const translations = { "0": "nueva", "1": "palabra", "2": "nueva", "3": "causa" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "0");
+  assert.equal(String(res[2].id), "1");
+  assert.equal(String(res[4].id), "2");
+  assert.equal(String(res[6].id), "3");
+});
+
+test("Requirement 12: Missing or incomplete translation metadata", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "маленькая" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "группа" },
+  ];
+  const meta = {};
+  const translations = { "0": "pequeño", "1": "grupo" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  // Fallback POS detection still reorders safely
+  assert.equal(String(res[0].id), "1");
+  assert.equal(String(res[2].id), "0");
+});
+
+test("Requirement 13: Multiple-word translations", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "хорошая" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "новость" },
+  ];
+  const meta = {
+    "0": { w: "хорошая", lemma: "хороший", pos: "ADJF" },
+    "1": { w: "новость", lemma: "новость", pos: "NOUN" },
+  };
+  const translations = { "0": "buenas", "1": "noticias" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  // "хороший" -> pre-noun adjective exception -> no swap
+  assert.equal(String(res[0].id), "0");
+  assert.equal(String(res[2].id), "1");
+});
+
+test("Requirement 14: Repeated invocation of reordering function (Idempotency)", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "маленькая" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "группа" },
+  ];
+  const meta = {
+    "0": { w: "маленькая", lemma: "маленький", pos: "ADJF" },
+    "1": { w: "группа", lemma: "группа", pos: "NOUN" },
+  };
+  const translations = { "0": "pequeño", "1": "grupo" };
+
+  const res1 = reorderNodes(nodes, translations, meta, "es");
+  const res2 = reorderNodes(res1, translations, meta, "es");
+  assert.deepEqual(res1, res2);
+});
+
+test("Requirement 15: Stable click-to-original-word mapping after reordering", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "маленькая" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "группа" },
+  ];
+  const meta = {
+    "0": { w: "маленькая", lemma: "маленький", pos: "ADJF" },
+    "1": { w: "группа", lemma: "группа", pos: "NOUN" },
+  };
+  const translations = { "0": "pequeño", "1": "grupo" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "1");
+  assert.equal(String(res[2].id), "0");
+  // Each node retains its original ID and source token reference
+  assert.equal(res[0].s, "группа");
+  assert.equal(res[2].s, "маленькая");
+});
+
+test("Requirement 16: Correct behavior in both language modes", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "интересная" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "книга" },
+  ];
+  const meta = {
+    "0": { w: "интересная", lemma: "интересный", pos: "ADJF" },
+    "1": { w: "книга", lemma: "книга", pos: "NOUN" },
+  };
+
+  const esRes = reorderNodes(nodes, { "0": "interesante", "1": "libro" }, meta, "es");
+  assert.equal(String(esRes[0].id), "1"); // libro interesante
+
+  const enRes = reorderNodes(nodes, { "0": "interesting", "1": "book" }, meta, "en");
+  assert.equal(String(enRes[0].id), "0"); // interesting book
 });

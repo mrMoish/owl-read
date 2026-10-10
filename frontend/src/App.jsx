@@ -30,8 +30,6 @@ function articleContext(data) {
   return blocks.map((block) => flattenText(block.nodes || [])).join(" ");
 }
 
-import { isEnglishMode } from "./useDaily.js";
-
 export default function App() {
   const { data, loading, error, notice, reload, isEn } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
@@ -56,6 +54,8 @@ export default function App() {
       manualTranslations,
     });
   }, [data?.meta, data?.translations, learnedWords, manualTranslations]);
+
+  const targetLang = isEn ? "en" : "es";
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
     if (!data?.date || !sentence) {
@@ -128,8 +128,8 @@ export default function App() {
         {data ? (
           <article>
             <h1>{data.date_label}</h1>
-            <Scripture block={data.verse} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} />
-            <Comment blocks={data.comment} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} />
+            <Scripture block={data.verse} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} lang={targetLang} />
+            <Comment blocks={data.comment} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} lang={targetLang} />
             {data.title && <p className="source">{data.title}</p>}
           </article>
         ) : loading ? (
