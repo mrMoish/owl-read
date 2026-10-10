@@ -42,13 +42,6 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   appearance: none;
   line-height: inherit;
   vertical-align: baseline;
-  will-change: transform;
-}
-
-.word--swapping {
-  z-index: 2;
-  position: relative;
-  display: inline-block;
 }
 
 .word:hover {
