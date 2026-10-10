@@ -17,7 +17,7 @@ def cache_key(*parts, lang: str = "ru"):
         date = ""
     else:
         date, word, sentence = parts
-    lang_tag = "ru-EN" if lang == "en" else LANG
+    lang_tag = "ru-EN" if lang == "en" else ("es-RU" if lang == "es" else LANG)
     text = f"v2|{date}|{lang_tag}|{word.lower()}|{sentence}"
     return hashlib.sha1(text.encode("utf-8")).hexdigest()
 

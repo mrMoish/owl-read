@@ -60,11 +60,11 @@ export const localDate = (now = new Date()) => {
 };
 
 export const loadDaily = (lang = "ru") => safe(() => {
-  const key = lang === "en" ? "reader.daily.en" : "reader.daily";
+  const key = lang === "en" ? "reader.daily.en" : (lang === "es" ? "reader.daily.es" : "reader.daily");
   return JSON.parse(localStorage.getItem(key) || "null");
 }, null);
 
 export const saveDaily = (d, lang = "ru") => safe(() => {
-  const key = lang === "en" ? "reader.daily.en" : "reader.daily";
+  const key = lang === "en" ? "reader.daily.en" : (lang === "es" ? "reader.daily.es" : "reader.daily");
   localStorage.setItem(key, JSON.stringify(d));
 });

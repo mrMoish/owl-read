@@ -4,13 +4,15 @@ async function j(path, opts) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
-export const fetchDaily = (date, isEn = false) => {
-  const query = isEn ? `date=${date}&en=1` : `date=${date}`;
+export const fetchDaily = (date, langMode = "ru") => {
+  const langParam = typeof langMode === "boolean" ? (langMode ? "en" : "ru") : langMode;
+  const query = langParam === "en" ? `date=${date}&en=1` : (langParam === "es" ? `date=${date}&lang=es` : `date=${date}`);
   return j(`/api/daily?${query}`);
 };
 
-export const requestTranslations = (date, isEn = false) => {
-  const query = isEn ? `date=${date}&en=1` : `date=${date}`;
+export const requestTranslations = (date, langMode = "ru") => {
+  const langParam = typeof langMode === "boolean" ? (langMode ? "en" : "ru") : langMode;
+  const query = langParam === "en" ? `date=${date}&en=1` : (langParam === "es" ? `date=${date}&lang=es` : `date=${date}`);
   return j(`/api/daily/translations?${query}`, { method: "POST" });
 };
 

@@ -29,6 +29,15 @@ SYSTEM_EN_RU = (
     "used in official JW Russian material when relevant. "
     'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
 )
+SYSTEM_ES_RU = (
+    "You translate single Spanish words, as used in a given Spanish sentence, into Russian "
+    "for a language-learning reader. For each item return the Russian word or short phrase (max 3 words) "
+    "that can translate the Spanish word in place, matching its grammatical form and meaning in context. "
+    "Keep the first letter capitalised if the source word is. "
+    "Use the provided Spanish sentence and the Russian WOL reference context to choose the most natural term "
+    "used in official JW Russian material when relevant. "
+    'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
+)
 SINGLE_SYSTEM_RU_ES = (
     "Translate the exact clicked Russian word only, not the surrounding words. "
     "Use the Russian sentence and Spanish WOL reference context to disambiguate the meaning. "
@@ -38,6 +47,15 @@ SINGLE_SYSTEM_RU_ES = (
     "Keep the answer natural Argentine Spanish (es-AR), neutral, not slang-heavy. "
     "If the clicked word is a proper name or a person name, return the name form only, not the full phrase. "
     "Use the exact clicked word's grammatical form and sentence meaning. "
+    "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.0-1.0}. "
+    "If the translation is uncertain, return the original word rather than a broader phrase."
+)
+SINGLE_SYSTEM_ES_RU = (
+    "Translate the exact clicked Spanish word into Russian only, not the surrounding words. "
+    "Use the Spanish sentence and Russian WOL reference context to disambiguate the meaning. "
+    "If the clicked word is a single word token, return a single-word Russian translation if possible. "
+    "Do not translate a full phrase or a full name when the user clicked only one word. "
+    "Keep the answer natural Russian. Keep the first letter capitalised if the source word is. "
     "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.0-1.0}. "
     "If the translation is uncertain, return the original word rather than a broader phrase."
 )
@@ -71,7 +89,7 @@ def parse_response(text: str, allowed_ids: set[int], lang: str = "ru") -> dict[i
         except (KeyError, TypeError, ValueError):
             continue
         if i in allowed_ids and val and len(val) <= 60:
-            if lang == "en":
+            if lang in ("en", "es"):
                 out[i] = val
             elif not CYR.search(val):
                 out[i] = val
@@ -90,7 +108,7 @@ def parse_single_response(text: str, lang: str = "ru") -> str:
         tr = tr.strip()
         if not tr or len(tr) > 60:
             raise TranslationError("translation invalid")
-        if lang != "en" and CYR.search(tr):
+        if lang not in ("en", "es") and CYR.search(tr):
             raise TranslationError("translation invalid")
         return tr
     except (ValueError, TypeError, KeyError) as e:
@@ -110,7 +128,7 @@ class OpenRouterClient:
             "context": context,
             "spanish_reference": spanish_reference or "",
         }
-        system_prompt = SINGLE_SYSTEM_EN_RU if lang == "en" else SINGLE_SYSTEM_RU_ES
+        system_prompt = SINGLE_SYSTEM_EN_RU if lang == "en" else (SINGLE_SYSTEM_ES_RU if lang == "es" else SINGLE_SYSTEM_RU_ES)
         body = {
             "model": self.model,
             "temperature": 0.1,
@@ -155,7 +173,7 @@ class OpenRouterClient:
         user_content: dict = {"items": items}
         if spanish_reference:
             user_content["spanish_reference"] = spanish_reference
-        system_prompt = SYSTEM_EN_RU if lang == "en" else SYSTEM_RU_ES
+        system_prompt = SYSTEM_EN_RU if lang == "en" else (SYSTEM_ES_RU if lang == "es" else SYSTEM_RU_ES)
         body = {
             "model": self.model, "temperature": 0.1,
             "response_format": {"type": "json_object"},
