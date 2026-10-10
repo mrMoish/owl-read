@@ -1,15 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { translateWord } from "./api.js";
 import {
-  loadTranslations,
-  saveTranslations,
   loadLearnedWords,
   addLearnedWord,
   removeLearnedWord,
 } from "./lib/storage.js";
 import {
   normalizeLemma,
-  findMatchingTokenIds,
   applyLearnedTranslations,
 } from "./lib/learned.js";
 import Scripture from "./components/Scripture.jsx";
@@ -35,7 +32,6 @@ function articleContext(data) {
 export default function App() {
   const { data, loading, error, notice, reload, isEn, langSource } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
-  const [manualTranslations, setManualTranslations] = useState({});
 
   const [isDebug, setIsDebug] = useState(false);
   const [swControlled, setSwControlled] = useState(false);
@@ -48,25 +44,14 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!data?.date) return;
-    setManualTranslations(loadTranslations(data.date));
-  }, [data?.date]);
-
-  useEffect(() => {
-    if (!data?.date) return;
-    saveTranslations(data.date, manualTranslations);
-  }, [data?.date, manualTranslations]);
-
-  // Вычисляем видимые переводы: локальные замены + глобально запомненные слова и словоформы
+  // Вычисляем видимые переводы: глобально запомненные слова и словоформы
   const visibleTranslations = useMemo(() => {
     return applyLearnedTranslations({
       meta: data?.meta,
       preparedTranslations: data?.translations,
       learnedWords,
-      manualTranslations,
     });
-  }, [data?.meta, data?.translations, learnedWords, manualTranslations]);
+  }, [data?.meta, data?.translations, learnedWords]);
 
   const targetLang = isEn ? "en" : "es";
 
@@ -89,16 +74,6 @@ export default function App() {
       // Пользователь нажал на переведённое слово -> сброс слова и его словоформ
       const nextLearned = removeLearnedWord(normLemma);
       setLearnedWords(nextLearned || {});
-
-      const matchingIds = findMatchingTokenIds(data?.meta, normLemma);
-      setManualTranslations((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        for (const mid of matchingIds) {
-          delete next[mid];
-        }
-        return next;
-      });
       return;
     }
 
@@ -125,20 +100,10 @@ export default function App() {
       return;
     }
 
-    // 2. Сохраняем выбор пользователя в постоянном глобальном хранилище
+    // 2. Сохраняем выбор пользователя в постоянном глобальном хранилище.
+    // Применение к текущему и последующим текстам произойдет через applyLearnedTranslations.
     const nextLearned = addLearnedWord(normLemma, translated);
     setLearnedWords(nextLearned || {});
-
-    // 3. Заменяем все вхождения этого слова и его словоформ в текущем тексте
-    const matchingIds = findMatchingTokenIds(data?.meta, normLemma);
-    setManualTranslations((prev) => {
-      const next = { ...prev, [key]: translated };
-      for (const mid of matchingIds) {
-        const contextEs = data?.translations?.[mid];
-        next[mid] = (contextEs && contextEs !== data?.meta?.[mid]?.w) ? contextEs : translated;
-      }
-      return next;
-    });
   };
 
   return (

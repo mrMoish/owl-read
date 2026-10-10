@@ -38,27 +38,20 @@ export function findMatchingTokenIds(meta = {}, targetLemma) {
  * - В первую очередь используется собственный подготовленный перевод токена (из preparedTranslations),
  *   так как он уже учитывает контекст конкретного предложения;
  * - Если подготовленный перевод для токена отсутствует (например, фоновый перевод ещё не завершён),
- *   используется сохранённый основной перевод леммы (primaryTranslation);
- * - Локальные ручные переопределения (manualTranslations) имеют приоритет.
+ *   используется сохранённый основной перевод леммы (primaryTranslation).
  */
 export function applyLearnedTranslations({
   meta = {},
   preparedTranslations = {},
   learnedWords = {},
-  manualTranslations = {},
 } = {}) {
-  const result = { ...manualTranslations };
+  const result = {};
   const learnedKeys = Object.keys(learnedWords);
   if (learnedKeys.length === 0) {
     return result;
   }
 
   for (const [idStr, info] of Object.entries(meta)) {
-    // Если для этого id уже есть локальная замена, оставляем её
-    if (result[idStr] !== undefined) {
-      continue;
-    }
-
     const lemma = normalizeLemma(info?.lemma || info?.w);
     const learned = learnedWords[lemma];
     if (learned) {

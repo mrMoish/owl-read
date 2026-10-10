@@ -1,19 +1,7 @@
-const P = "reader.translations";
 const L = "reader.learned";
 const safe = (f, d) => { try { return f(); } catch { return d; } };
 
 import { normalizeLemma } from "./learned.js";
-
-export const loadTranslations = (date) => safe(() => {
-  const raw = JSON.parse(localStorage.getItem(P) || "{}");
-  return raw[date] || {};
-}, {});
-
-export const saveTranslations = (date, data) => safe(() => {
-  const raw = JSON.parse(localStorage.getItem(P) || "{}");
-  raw[date] = data;
-  localStorage.setItem(P, JSON.stringify(raw));
-});
 
 export const loadLearnedWords = () => safe(() => {
   return JSON.parse(localStorage.getItem(L) || "{}");
