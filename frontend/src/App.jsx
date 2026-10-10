@@ -16,7 +16,7 @@ import Scripture from "./components/Scripture.jsx";
 import Comment from "./components/Comment.jsx";
 import { useDaily } from "./useDaily.js";
 
-const BUILD_ID = "2026.10.10.v5";
+const BUILD_ID = "2026.10.10.v6-path";
 
 function flattenText(nodes) {
   return nodes.map((n) => {
@@ -33,7 +33,7 @@ function articleContext(data) {
 }
 
 export default function App() {
-  const { data, loading, error, notice, reload, isEn, langSource } = useDaily();
+  const { data, loading, error, notice, reload, isEn } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
   const [manualTranslations, setManualTranslations] = useState({});
 
@@ -42,9 +42,11 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      setIsDebug(params.has("debug"));
+      const checkHash = () => setIsDebug(window.location.hash === "#debug");
+      checkHash();
+      window.addEventListener("hashchange", checkHash);
       setSwControlled(Boolean(navigator.serviceWorker?.controller));
+      return () => window.removeEventListener("hashchange", checkHash);
     }
   }, []);
 
@@ -74,7 +76,6 @@ export default function App() {
     window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true
   );
 
-  const rawStoredLang = typeof window !== "undefined" ? localStorage.getItem("reader.lang") : null;
   const lastApiUrl = data?.date ? `/api/daily?date=${data.date}${isEn ? "&en=1" : ""}` : "N/A";
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
@@ -152,8 +153,7 @@ export default function App() {
             <div><strong>location.href:</strong> {typeof window !== "undefined" ? window.location.href : ""}</div>
             <div><strong>Standalone mode:</strong> {isStandalone ? "True (PWA)" : "False (Browser)"}</div>
             <div><strong>Effective Lang:</strong> {isEn ? "English (en)" : "Spanish (es/default)"}</div>
-            <div><strong>Lang Source:</strong> {langSource}</div>
-            <div><strong>Raw Stored reader.lang:</strong> {rawStoredLang || "null"}</div>
+            <div><strong>Lang Source:</strong> URL path</div>
             <div><strong>Last /api/daily Request:</strong> {lastApiUrl}</div>
             <div><strong>Response Date / Label:</strong> {data ? `${data.date} (${data.date_label})` : "loading..."}</div>
           </section>
