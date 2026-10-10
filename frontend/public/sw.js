@@ -1,7 +1,7 @@
 // Service Worker: кэширует оболочку приложения (HTML/JS/CSS/иконки).
 // Запросы к /api/* НЕ перехватываются: материал дня всегда запрашивается у backend,
 // а офлайн-копию хранит само приложение (localStorage).
-const VERSION = "v5";
+const VERSION = "v4";
 const SHELL = `shell-${VERSION}`;
 const PRECACHE = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
