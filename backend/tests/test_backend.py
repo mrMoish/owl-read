@@ -5,7 +5,7 @@ import httpx
 from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.main import create_app
-from app.textproc.analyzer import analyze_blocks, priority_order
+from app.textproc.analyzer import analyze_blocks, priority_order, format_text_node
 from app.store import Store
 from app.daily import DailyService
 from app.translation.service import TranslationService
@@ -319,3 +319,13 @@ def test_english_mode_support(tmp_path):
         assert "Христианам" in captured["spanish_ref"]
     finally:
         o.OpenRouterClient.__init__ = orig
+
+
+def test_format_text_node_and_analyzer_punctuation_binding():
+    assert format_text_node("текст — продолжение") == "текст\u00a0— продолжение"
+    assert format_text_node("слово , другое") == "слово, другое"
+    blocks = [{"nodes": [{"t": "text", "s": "Иерусалим — город , где жили люди"}]}]
+    out_blocks, _, _ = analyze_blocks(blocks)
+    texts = [n["s"] for n in out_blocks[0]["nodes"] if n["t"] == "text"]
+    assert any("\u00a0—" in t for t in texts)
+    assert not any(" ," in t for t in texts)

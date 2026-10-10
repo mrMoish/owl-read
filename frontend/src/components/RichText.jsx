@@ -1,9 +1,10 @@
 import React, { useLayoutEffect, useRef } from "react";
 import { reorderNodes } from "../lib/swap.js";
+import { formatTextNode } from "../lib/punct.js";
 
 function Node({ node, index, translations, onWordClick, meta, registerRef, lang }) {
   if (!node) return null;
-  if (node.t === "text") return node.s;
+  if (node.t === "text") return formatTextNode(node.s);
   if (node.t === "w") {
     const id = String(node.id);
     const word = node.s;
