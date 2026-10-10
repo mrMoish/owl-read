@@ -17,6 +17,8 @@ log = logging.getLogger("reader")
 def _resolve_lang(lang_param: str | None, en_param: str | None) -> str:
     if en_param is not None or lang_param == "en":
         return "en"
+    if lang_param == "es":
+        return "es"
     return "ru"
 
 
@@ -59,6 +61,8 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
         try:
             if active_lang == "en":
                 content, notice = await daily.get_english(date)
+            elif active_lang == "es":
+                content, notice = await daily.get_spanish(date)
             else:
                 content, notice = await daily.get(date)
         except WolError as e:
@@ -76,13 +80,15 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
         try:
             if active_lang == "en":
                 content, notice = await daily.get_english(date)
+            elif active_lang == "es":
+                content, notice = await daily.get_spanish(date)
             else:
                 content, notice = await daily.get(date)
         except WolError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
         ref_text = ""
         try:
-            if active_lang == "en":
+            if active_lang in ("en", "es"):
                 ref_content, _ = await daily.get(date or None)
             else:
                 ref_content, _ = await daily.get_spanish(date or None)
@@ -104,17 +110,24 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
         lang = str(payload.get("lang") or "").strip()
         if not word or not sentence:
             raise HTTPException(400, "word и sentence обязательны")
-        active_lang = "en" if lang == "en" or payload.get("en") is not None else "ru"
+        if lang == "en" or payload.get("en") is not None:
+            active_lang = "en"
+        elif lang == "es":
+            active_lang = "es"
+        else:
+            active_lang = "ru"
         try:
             if active_lang == "en":
                 content, _ = await daily.get_english(date or None)
+            elif active_lang == "es":
+                content, _ = await daily.get_spanish(date or None)
             else:
                 content, _ = await daily.get(date or None)
         except WolError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
         ref_text = ""
         try:
-            if active_lang == "en":
+            if active_lang in ("en", "es"):
                 ref_content, _ = await daily.get(date or None)
             else:
                 ref_content, _ = await daily.get_spanish(date or None)

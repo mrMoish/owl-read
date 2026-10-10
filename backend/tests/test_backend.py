@@ -6,6 +6,9 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.main import create_app
 from app.textproc.analyzer import analyze_blocks, priority_order
+from app.store import Store
+from app.daily import DailyService
+from app.translation.service import TranslationService
 from app.translation.openrouter import OpenRouterClient, parse_response
 from app.wol.fetcher import WolError
 from app.wol.parser import parse_wol_page
@@ -191,6 +194,79 @@ def test_custom_date_query_param(tmp_path):
 
     r3 = c.get(f"/api/daily?date={d3}").json()
     assert r3["date"] == "2026-10-08"
+
+
+def test_spanish_mode_support(tmp_path):
+    es_page = """<html><body><div class="todayItems">
+<div class="todayItem"><header><h2>Martes 6 de octubre</h2></header>
+<p><em>«La Ley es solo una sombra» (<a href="/es/wol/bc/1">Heb. 10:1</a>).</em></p>
+<p>A los cristianos de Judea no les resultaba fácil la vida. <a href="/pc/1"><em>w24.09</em> 9</a></p>
+<p><a href="/d/1">Examen diario de las Escrituras 2026</a></p></div>
+</div></body></html>"""
+
+    ru_page = """<html><body><div class="todayItems">
+<div class="todayItem"><header><h2>Вторник, 6 октября</h2></header>
+<p><em>«Закон — лишь тень» (<a href="/ru/wol/bc/1">Евр. 10:1</a>).</em></p>
+<p>Христианам в Иудее было непросто. <a href="/pc/1"><em>w24.09</em> 9</a></p>
+<p><a href="/d/1">Исследуем Писание каждый день — 2026</a></p></div>
+</div></body></html>"""
+
+    def pages(day, lang="ru"):
+        return es_page if lang == "es" else ru_page
+
+    def fetch_mock(base, day, client=None, language="ru"):
+        return pages(day, lang=language)
+
+    app = make_app(tmp_path, pages=None)
+    # inject custom fetchers into daily service
+    daily_svc = app.extra.get("daily") if hasattr(app, "extra") else None
+
+    captured_prompts = []
+
+    def handler(request):
+        payload = json.loads(request.content.decode("utf-8"))
+        captured_prompts.append(payload)
+        items = json.loads(payload["messages"][1]["content"])["items"]
+        rows = [{"id": i["id"], "es": "закон" if i["word"].lower() == "ley" else "слово"} for i in items]
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
+
+    mock_client = httpx.MockTransport(handler)
+    http_client = httpx.AsyncClient(transport=mock_client)
+
+    store = Store(tmp_path / "app.sqlite3")
+    client_tr = OpenRouterClient("fake-key", "gpt-4o-mini", http=http_client)
+    tr = TranslationService(store, client_tr)
+    daily = DailyService(replace(get_settings(), db_path=tmp_path / "app.sqlite3"), store, tr,
+                         fetch=lambda b, d, client=None: ru_page,
+                         fetch_spanish=lambda b, d, client=None: es_page,
+                         fetch_english=lambda b, d, client=None: "")
+
+    app = create_app(settings=replace(get_settings(), db_path=tmp_path / "app.sqlite3"))
+    # override daily with our configured daily service
+    app.router.on_startup.clear()
+
+    with TestClient(app) as c:
+        app.extra = getattr(app, "extra", {})
+        # Replace service logic in app context by creating app with fetch override
+        async def fetch_ru_mock(b, d, client=None):
+            return ru_page
+
+        async def fetch_es_mock(b, d, client=None):
+            return es_page
+
+        app_custom = create_app(
+            settings=replace(get_settings(), db_path=tmp_path / "app.sqlite3"),
+            fetch=fetch_ru_mock,
+            fetch_spanish=fetch_es_mock,
+        )
+        c_custom = TestClient(app_custom)
+        r = c_custom.get("/api/daily?date=2026-10-06&lang=es").json()
+        assert r["date_label"] == "Martes 6 de octubre"
+        assert any(m["w"] == "cristianos" for m in r["meta"].values())
+
+        # Check /api/daily/translations with es mode
+        tr_resp = c_custom.post("/api/daily/translations?date=2026-10-06&lang=es").json()
+        assert "translations" in tr_resp
 
 
 def test_english_mode_support(tmp_path):

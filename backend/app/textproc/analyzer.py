@@ -12,7 +12,8 @@ import pymorphy3
 
 WORD_RE = re.compile(r"[А-Яа-яЁё]+(?:-[А-Яа-яЁё]+)*")
 EN_WORD_RE = re.compile(r"[A-Za-z]+(?:-[A-Za-z]+)*")
-SENT_RE = re.compile(r"(?<=[.!?…])[»\"\)]*\s+(?=[«\"—А-ЯЁA-Z])")
+ES_WORD_RE = re.compile(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+(?:-[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+)*")
+SENT_RE = re.compile(r"(?<=[.!?…])[»\"\)]*\s+(?=[«\"—А-ЯЁA-ZÁÉÍÓÚÑÜ])")
 
 
 @lru_cache(maxsize=1)
@@ -28,6 +29,8 @@ def judge(word: str, first_in_sentence: bool, lang: str = "ru"):
         return None
     if lang == "en":
         return (word.lower(), "EN")
+    if lang == "es":
+        return (word.lower(), "ES")
     parses = _morph().parse(word.lower())
     if not parses:
         return None
@@ -73,7 +76,7 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0, lang: str = "ru"):
     meta: dict[int, dict] = {}
     nid = start_id
     out_blocks = []
-    word_re = EN_WORD_RE if lang == "en" else WORD_RE
+    word_re = EN_WORD_RE if lang == "en" else (ES_WORD_RE if lang == "es" else WORD_RE)
     for blk in blocks:
         ctx = _Ctx(_plain(blk["nodes"]))
 

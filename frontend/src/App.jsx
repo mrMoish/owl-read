@@ -30,7 +30,7 @@ function articleContext(data) {
 }
 
 export default function App() {
-  const { data, loading, error, notice, reload, isEn, langSource } = useDaily();
+  const { data, loading, error, notice, reload, isEn, langMode, langSource } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
 
   const [isDebug, setIsDebug] = useState(false);
@@ -53,7 +53,8 @@ export default function App() {
     });
   }, [data?.meta, data?.translations, learnedWords]);
 
-  const targetLang = isEn ? "en" : "es";
+  const currentLang = langMode || (isEn ? "en" : "ru");
+  const targetLang = currentLang === "en" ? "ru" : (currentLang === "es" ? "ru" : "es");
 
   const isStandalone = typeof window !== "undefined" && (
     window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true
@@ -87,7 +88,7 @@ export default function App() {
           sentence,
           context: context || articleContext(data),
           date: data.date,
-          lang: isEn ? "en" : "ru",
+          lang: currentLang,
         };
         const res = await translateWord(payload);
         translated = res?.translation || res?.original || word;
@@ -116,7 +117,7 @@ export default function App() {
             <div><strong>SW Controlled:</strong> {swControlled ? "Yes (active)" : "No"}</div>
             <div><strong>location.href:</strong> {typeof window !== "undefined" ? window.location.href : ""}</div>
             <div><strong>Standalone mode:</strong> {isStandalone ? "True (PWA)" : "False (Browser)"}</div>
-            <div><strong>Effective Lang:</strong> {isEn ? "English (en)" : "Spanish (es/default)"}</div>
+            <div><strong>Effective Lang:</strong> {currentLang}</div>
             <div><strong>Lang Source:</strong> {langSource}</div>
             <div><strong>Raw Stored reader.lang:</strong> {rawStoredLang || "null"}</div>
             <div><strong>Last /api/daily Request:</strong> {lastApiUrl}</div>
