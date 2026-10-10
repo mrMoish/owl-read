@@ -37,8 +37,9 @@ export function shouldSwapPair(w1, w2, translations = {}, meta = {}) {
   const info2 = meta[String(w2.id)] || {};
 
   if (isAdj(w1.s, info1) && isNoun(w2.s, info2)) {
+    const tr1 = Boolean(translations[String(w1.id)]);
     const tr2 = Boolean(translations[String(w2.id)]);
-    if (tr2) {
+    if (tr1 && tr2) {
       return true;
     }
   }
