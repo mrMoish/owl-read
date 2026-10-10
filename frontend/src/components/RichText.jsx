@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef } from "react";
 import { reorderNodes } from "../lib/swap.js";
 
-function Node({ node, index, translations, onWordClick, meta, registerRef }) {
+function Node({ node, index, translations, onWordClick, meta, registerRef, lang }) {
   if (!node) return null;
   if (node.t === "text") return node.s;
   if (node.t === "w") {
@@ -10,10 +10,12 @@ function Node({ node, index, translations, onWordClick, meta, registerRef }) {
     const info = meta[id] || {};
     const translated = translations[id];
     const content = translated || word;
+    const wordLang = translated ? lang : "ru";
     return (
       <span
         key={id}
         ref={(el) => registerRef && registerRef(id, el)}
+        lang={wordLang}
         className={`word ${translated ? "word--translated" : ""}`}
         onClick={() => onWordClick({
           id: node.id,
@@ -52,6 +54,7 @@ function Node({ node, index, translations, onWordClick, meta, registerRef }) {
       onWordClick={onWordClick}
       meta={meta}
       registerRef={registerRef}
+      lang={lang}
     />
   )) : null;
 
@@ -126,6 +129,7 @@ export default function RichText({ nodes = [], translations = {}, onWordClick = 
       onWordClick={onWordClick}
       meta={meta}
       registerRef={registerRef}
+      lang={lang}
     />
   ));
 }
