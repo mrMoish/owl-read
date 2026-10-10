@@ -20,14 +20,13 @@ SYSTEM_RU_ES = (
     "used in official JW Spanish material when relevant. "
     'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
 )
-SYSTEM_RU_EN = (
-    "You translate single Russian words, as used in a given sentence, into English "
-    "for a language-learning reader. For each item return the English word or short phrase (max 3 words) "
-    "that can REPLACE the Russian word in place, matching its grammatical form (tense, person, number, "
-    "case function) so the sentence stays correct. Choose the sense that fits the sentence. "
+SYSTEM_EN_RU = (
+    "You translate single English words, as used in a given English sentence, into Russian "
+    "for a language-learning reader. For each item return the Russian word or short phrase (max 3 words) "
+    "that can translate the English word in place, matching its grammatical form and meaning in context. "
     "Keep the first letter capitalised if the source word is. "
-    "Use the provided Russian sentence and the English WOL reference context to choose the most natural term "
-    "used in official JW English material when relevant. "
+    "Use the provided English sentence and the Russian WOL reference context to choose the most natural term "
+    "used in official JW Russian material when relevant. "
     'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
 )
 SINGLE_SYSTEM_RU_ES = (
@@ -42,12 +41,12 @@ SINGLE_SYSTEM_RU_ES = (
     "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.0-1.0}. "
     "If the translation is uncertain, return the original word rather than a broader phrase."
 )
-SINGLE_SYSTEM_RU_EN = (
-    "Translate the exact clicked Russian word into English only, not the surrounding words. "
-    "Use the Russian sentence and English WOL reference context to disambiguate the meaning. "
-    "If the clicked word is a single word token, return a single-word English translation if possible. "
+SINGLE_SYSTEM_EN_RU = (
+    "Translate the exact clicked English word into Russian only, not the surrounding words. "
+    "Use the English sentence and Russian WOL reference context to disambiguate the meaning. "
+    "If the clicked word is a single word token, return a single-word Russian translation if possible. "
     "Do not translate a full phrase or a full name when the user clicked only one word. "
-    "Keep the answer natural English. Keep the first letter capitalised if the source word is. "
+    "Keep the answer natural Russian. Keep the first letter capitalised if the source word is. "
     "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.0-1.0}. "
     "If the translation is uncertain, return the original word rather than a broader phrase."
 )
@@ -67,11 +66,15 @@ def parse_response(text: str, allowed_ids: set[int], lang: str = "ru") -> dict[i
     out: dict[int, str] = {}
     for r in rows if isinstance(rows, list) else []:
         try:
-            i, es = int(r["id"]), str(r["es"]).strip()
+            i = int(r["id"])
+            val = str(r.get("es") if r.get("es") is not None else (r.get("ru") if r.get("ru") is not None else r.get("translation", ""))).strip()
         except (KeyError, TypeError, ValueError):
             continue
-        if i in allowed_ids and es and len(es) <= 60 and not CYR.search(es):
-            out[i] = es
+        if i in allowed_ids and val and len(val) <= 60:
+            if lang == "en":
+                out[i] = val
+            elif not CYR.search(val):
+                out[i] = val
     return out
 
 
@@ -80,10 +83,14 @@ def parse_single_response(text: str, lang: str = "ru") -> str:
     try:
         data = json.loads(text)
         tr = data.get("translation") if isinstance(data, dict) else None
+        if tr is None and isinstance(data, dict):
+            tr = data.get("ru") or data.get("es")
         if not isinstance(tr, str):
             raise TranslationError("translation field missing")
         tr = tr.strip()
-        if not tr or len(tr) > 60 or CYR.search(tr):
+        if not tr or len(tr) > 60:
+            raise TranslationError("translation invalid")
+        if lang != "en" and CYR.search(tr):
             raise TranslationError("translation invalid")
         return tr
     except (ValueError, TypeError, KeyError) as e:
@@ -103,7 +110,7 @@ class OpenRouterClient:
             "context": context,
             "spanish_reference": spanish_reference or "",
         }
-        system_prompt = SINGLE_SYSTEM_RU_EN if lang == "en" else SINGLE_SYSTEM_RU_ES
+        system_prompt = SINGLE_SYSTEM_EN_RU if lang == "en" else SINGLE_SYSTEM_RU_ES
         body = {
             "model": self.model,
             "temperature": 0.1,
@@ -148,7 +155,7 @@ class OpenRouterClient:
         user_content: dict = {"items": items}
         if spanish_reference:
             user_content["spanish_reference"] = spanish_reference
-        system_prompt = SYSTEM_RU_EN if lang == "en" else SYSTEM_RU_ES
+        system_prompt = SYSTEM_EN_RU if lang == "en" else SYSTEM_RU_ES
         body = {
             "model": self.model, "temperature": 0.1,
             "response_format": {"type": "json_object"},
