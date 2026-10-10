@@ -557,3 +557,101 @@ test("Requirement 16: Correct behavior in both language modes", () => {
   const enRes = reorderNodes(nodes, { "0": "interesting", "1": "book" }, meta, "en");
   assert.equal(String(enRes[0].id), "0"); // interesting book
 });
+
+test("Demonstratives, possessives, and relative words in sentence structure: «Этот хлеб — моё тело, которое я отдам, чтобы мир жил.»", () => {
+  // Исходное предложение: «Этот хлеб — моё тело, которое я отдам, чтобы мир жил.»
+  // Испанский перевод: «Este pan es mi cuerpo, que entregaré para que el mundo viva.»
+  const sentence = "Этот хлеб — моё тело, которое я отдам, чтобы мир жил.";
+  const nodes = [
+    { t: "w", id: 0, s: "Этот" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "хлеб" },
+    { t: "text", s: " — " },
+    { t: "w", id: 2, s: "моё" },
+    { t: "text", s: " " },
+    { t: "w", id: 3, s: "тело" },
+    { t: "text", s: ", " },
+    { t: "w", id: 4, s: "которое" },
+    { t: "text", s: " " },
+    { t: "w", id: 5, s: "я" },
+    { t: "text", s: " " },
+    { t: "w", id: 6, s: "отдам" },
+    { t: "text", s: ", " },
+    { t: "w", id: 7, s: "чтобы" },
+    { t: "text", s: " " },
+    { t: "w", id: 8, s: "мир" },
+    { t: "text", s: " " },
+    { t: "w", id: 9, s: "жил" },
+    { t: "text", s: "." },
+  ];
+
+  const meta = {
+    "0": { w: "Этот", lemma: "этот", pos: "ADJF", sent: sentence },
+    "1": { w: "хлеб", lemma: "хлеб", pos: "NOUN", sent: sentence },
+    "2": { w: "моё", lemma: "мой", pos: "ADJF", sent: sentence },
+    "3": { w: "тело", lemma: "тело", pos: "NOUN", sent: sentence },
+    "4": { w: "которое", lemma: "который", pos: "ADJF", sent: sentence },
+    "5": { w: "я", lemma: "я", pos: "NPRO", sent: sentence },
+    "6": { w: "отдам", lemma: "отдать", pos: "VERB", sent: sentence },
+    "7": { w: "чтобы", lemma: "чтобы", pos: "CONJ", sent: sentence },
+    "8": { w: "мир", lemma: "мир", pos: "NOUN", sent: sentence },
+    "9": { w: "жил", lemma: "жить", pos: "VERB", sent: sentence },
+  };
+
+  const translations = {
+    "0": "Este",
+    "1": "pan",
+    "2": "mi",
+    "3": "cuerpo",
+    "4": "que",
+    "5": "yo",
+    "6": "entregaré",
+    "7": "para que",
+    "8": "el mundo",
+    "9": "viva",
+  };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+
+  // Убеждаемся, что порядок слов не нарушается (нет ложных перестановок у "Este pan", "mi cuerpo", "que...")
+  const resultIds = res.filter((n) => n.t === "w").map((n) => n.id);
+  assert.deepEqual(resultIds, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+  // Убеждаемся, что «Этот хлеб» остается в порядке [0, 1] ("Este", "pan")
+  assert.equal(shouldSwapPair(nodes[0], nodes[2], translations, meta, "es"), false); // 0 ("Этот") и 1 ("хлеб")
+  assert.equal(shouldSwapPair(nodes[4], nodes[6], translations, meta, "es"), false); // 2 ("моё") и 3 ("тело")
+});
+
+test("Additional Word Order Patterns: Possessive pronouns (наш, ваш, свой)", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "наш" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "дом" },
+  ];
+  const meta = {
+    "0": { w: "наш", lemma: "наш", pos: "ADJF" },
+    "1": { w: "дом", lemma: "дом", pos: "NOUN" },
+  };
+  const translations = { "0": "nuestra", "1": "casa" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "0"); // nuestra
+  assert.equal(String(res[2].id), "1"); // casa
+});
+
+test("Additional Word Order Patterns: Ordinal numbers (первый день)", () => {
+  const nodes = [
+    { t: "w", id: 0, s: "первый" },
+    { t: "text", s: " " },
+    { t: "w", id: 1, s: "день" },
+  ];
+  const meta = {
+    "0": { w: "первый", lemma: "первый", pos: "ADJF" },
+    "1": { w: "день", lemma: "день", pos: "NOUN" },
+  };
+  const translations = { "0": "primer", "1": "día" };
+
+  const res = reorderNodes(nodes, translations, meta, "es");
+  assert.equal(String(res[0].id), "0"); // primer
+  assert.equal(String(res[2].id), "1"); // día
+});

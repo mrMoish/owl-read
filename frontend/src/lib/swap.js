@@ -3,35 +3,45 @@
  * при переводе с русского на испанский (es) и английский (en) языки.
  */
 
-// Леммы и слова-исключения для испанского языка (прилагательные, которые обычно ставятся ПЕРЕД существительным):
-// - порядковые и ограничительные: последний, первый, второй, следующий и т.д.
-// - оценочно-размерные: большой, великий, малый, плохой, хороший, каждый, какой, иной, другой и т.д.
-const ES_PRE_NOUN_ADJ_LEMMAS = new Set([
-  "последний",
-  "первый",
-  "второй",
-  "третий",
-  "четвертый",
-  "пятый",
-  "следующий",
-  "прошлый",
-  "большой",
-  "великий",
-  "малый",
-  "маленький", // Если переводится как "gran" или фиксированное выражение, но "маленькая группа" -> "grupo pequeño"
-  "хороший",
-  "плохой",
-  "лучший",
-  "худший",
-  "каждый",
-  "какой",
-  "иной",
-  "другой",
-  "новый",
+// Русский язык: Леммы определителей, местоимений-прилагательных, числительных
+// и пре-позиционных прилагательных, которые остаются перед существительным.
+const RU_PRE_NOUN_LEMMAS = new Set([
+  // Указательные местоимения (Demonstratives)
+  "этот", "тот", "такой", "сей", "оный", "эдакий", "таковой",
+  // Притяжательные местоимения (Possessives)
+  "мой", "твой", "свой", "наш", "ваш", "его", "ее", "её", "их",
+  // Относительные и вопросительные (Relatives & Interrogatives)
+  "который", "какой", "чей", "каков", "сколько",
+  // Определительные, неопределенные, отрицательные, кванторы (Determiners / Indefinites)
+  "каждый", "всякий", "любой", "весь", "всяческий", "некоторый", "никакой", "некий", "иной", "другой", "один", "сам", "самый",
+  // Порядковые и числительные (Ordinals & Numerals)
+  "первый", "второй", "третий", "четвертый", "четвёртый", "пятый", "шестой", "седьмой", "восьмой", "девятый", "десятый",
+  "последний", "следующий", "прошлый",
+  // Оценочно-размерные и качественные пре-позиционные в испанском/русском
+  "большой", "великий", "малый", "хороший", "плохой", "лучший", "худший", "новый",
+]);
+
+// Испанский язык: Слова/леммы/апокопы, которые ставятся перед существительным (Pre-noun determiners & adjectives)
+const ES_PRE_NOUN_WORDS = new Set([
+  // Demonstratives
+  "este", "esta", "estos", "estas", "ese", "esa", "esos", "esas", "aquel", "aquella", "aquellos", "aquellas",
+  // Possessives
+  "mi", "mis", "tu", "tus", "su", "sus", "nuestro", "nuestra", "nuestros", "nuestras", "vuestro", "vuestra", "vuestros", "vuestras",
+  // Relatives / Interrogatives
+  "que", "qué", "cual", "cuál", "cuyo", "cuya", "cuyos", "cuyas", "cuanto", "cuántos",
+  // Indefinites / Quantifiers
+  "cada", "todo", "toda", "todos", "todas", "mismo", "misma", "mismos", "mismas", "otro", "otra", "otros", "otras",
+  "algún", "alguno", "alguna", "algunos", "algunas", "ningún", "ninguno", "ninguna",
+  "mucho", "mucha", "muchos", "muchas", "poco", "poca", "pocos", "pocas", "varios", "varias", "cierto", "cierta", "ciertos", "ciertas",
+  // Apocopes & Pre-noun Adjectives
+  "gran", "buen", "bueno", "buenas", "buenos", "mal", "malo", "malas", "malos",
+  "primer", "primero", "primera", "primeros", "primeras",
+  "tercer", "tercero", "tercera", "terceros", "terceras",
+  "segundo", "segunda", "último", "última", "últimos", "últimas", "nuevo", "nueva", "nuevos", "nuevas",
 ]);
 
 /**
- * Определение части речи: прилагательное (исходя из POS metadata или морфологии).
+ * Определение части речи: прилагательное/определитель (исходя из POS metadata или морфологии).
  */
 export function isAdj(word, info = {}) {
   const pos = String(info.pos || "").toUpperCase();
@@ -83,7 +93,7 @@ function isFixedExpression(w1, w2, meta = {}) {
 }
 
 /**
- * Определяет, нужно ли переставить пару w1 (прилагательное) и w2 (существительное).
+ * Определяет, нужно ли переставить пару w1 (прилагательное/определитель) и w2 (существительное).
  */
 export function shouldSwapPair(w1, w2, translations = {}, meta = {}, lang = "es") {
   if (!w1 || !w2 || w1.t !== "w" || w2.t !== "w") {
@@ -108,7 +118,7 @@ export function shouldSwapPair(w1, w2, translations = {}, meta = {}, lang = "es"
   const info1 = meta[id1] || {};
   const info2 = meta[id2] || {};
 
-  // Проверяем, что w1 — прилагательное, а w2 — существительное
+  // Проверяем, что w1 — прилагательное/определитель, а w2 — существительное
   if (!isAdj(w1.s, info1) || !isNoun(w2.s, info2)) {
     return false;
   }
@@ -121,23 +131,20 @@ export function shouldSwapPair(w1, w2, translations = {}, meta = {}, lang = "es"
   const lemma1 = (info1.lemma || w1.s || "").toLowerCase();
   const tr1Lower = String(tr1).toLowerCase().trim();
 
-  // Исключения для испанского:
-  // 1. "большая проблема" -> "gran проблема" (апокопа "gran" ставится перед существительным)
-  if (lemma1 === "большой" || tr1Lower === "gran" || tr1Lower.startsWith("gran ")) {
+  // 1. Если исходное русское слово (лемма) или его перевод являются пре-позиционным определителем,
+  // притяжательным/указательным/относительным местоимением, числительным или пре-позиционным прилагательным
+  // в испанском языке (например, "этот" -> "este", "мой" -> "mi", "который" -> "que", "первый" -> "primer", "большая" -> "gran"),
+  // порядок слов НЕ меняется.
+  if (RU_PRE_NOUN_LEMMAS.has(lemma1) || ES_PRE_NOUN_WORDS.has(tr1Lower)) {
     return false;
   }
 
-  // 2. Порядковые/ограничительные прилагательные ("последний", "первый" и т.д.)
-  if (lemma1 === "последний" || lemma1 === "первый" || lemma1 === "следующий") {
+  const tr1FirstWord = tr1Lower.split(/\s+/)[0];
+  if (ES_PRE_NOUN_WORDS.has(tr1FirstWord)) {
     return false;
   }
 
-  // 3. Если переведённое слово w1 явным образом ставится перед существительным
-  if (ES_PRE_NOUN_ADJ_LEMMAS.has(lemma1) && lemma1 !== "маленький" && lemma1 !== "интересный") {
-    return false;
-  }
-
-  // Стандартное правило для испанского языка: качественные прилагательные идут после существительного
+  // Стандартное правило для испанского языка: качественные описательные прилагательные идут после существительного
   // ("маленькая группа" -> "grupo pequeño", "интересная книга" -> "libro interesante")
   return true;
 }
