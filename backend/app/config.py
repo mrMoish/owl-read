@@ -16,6 +16,7 @@ class Settings:
     timezone: str
     wol_base_url: str
     es_wol_base_url: str
+    en_wol_base_url: str
     translate_max_share: float  # legacy, kept for compatibility but no longer used by UX
     frontend_dist: Path
 
@@ -28,6 +29,7 @@ def get_settings() -> Settings:
         timezone=os.environ.get("APP_TIMEZONE", "America/Argentina/Buenos_Aires"),
         wol_base_url=os.environ.get("WOL_BASE_URL", "https://wol.jw.org/ru/wol/h/r2/lp-u/2026/10/8"),
         es_wol_base_url=os.environ.get("WOL_ES_BASE_URL", "https://wol.jw.org/es/wol/h/r4/lp-s/2026/10/8"),
+        en_wol_base_url=os.environ.get("WOL_EN_BASE_URL", "https://wol.jw.org/en/wol/h/r1/lp-e/2026/10/8"),
         translate_max_share=0.5,
         frontend_dist=ROOT / "frontend" / "dist",
     )

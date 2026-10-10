@@ -9,9 +9,10 @@ from .wol.parser import parse_wol_page
 
 
 class DailyService:
-    def __init__(self, settings, store, translator, fetch=fetch_wol_page, fetch_spanish=None):
+    def __init__(self, settings, store, translator, fetch=fetch_wol_page, fetch_spanish=None, fetch_english=None):
         self.s, self.store, self.tr, self.fetch = settings, store, translator, fetch
         self.fetch_spanish = fetch_spanish or (lambda base, day, client=None: fetch_wol_page(base, day, client=client, language="es"))
+        self.fetch_english = fetch_english or (lambda base, day, client=None: fetch_wol_page(base, day, client=client, language="en"))
         self._locks: dict[str, asyncio.Lock] = {}
 
     def resolve_date(self, client_date: str | None) -> date:
@@ -38,7 +39,7 @@ class DailyService:
                 return saved, None
             try:
                 html = await fetch_fn(base_url, day)
-                content = self.build(parse_wol_page(html, day), key)
+                content = self.build(parse_wol_page(html, day), key, lang=lang)
             except WolError as e:
                 last = self.store.latest_daily(lang=lang)
                 if last:
@@ -57,9 +58,14 @@ class DailyService:
         day = self.resolve_date(client_date)
         return await self._get_by_lang(day, self.fetch_spanish, self.s.es_wol_base_url, "es")
 
+    async def get_english(self, client_date: str | None = None):
+        """-> (content, stale_notice|None) for English WOL."""
+        day = self.resolve_date(client_date)
+        return await self._get_by_lang(day, self.fetch_english, self.s.en_wol_base_url, "en")
+
     @staticmethod
-    def build(parsed: dict, key: str) -> dict:
-        blocks, meta, _ = analyze_blocks([parsed["verse"], *parsed["comment"]])
+    def build(parsed: dict, key: str, lang: str = "ru") -> dict:
+        blocks, meta, _ = analyze_blocks([parsed["verse"], *parsed["comment"]], lang=lang)
         return {"date": key, "date_label": parsed["date_label"], "title": parsed["title"],
                 "verse": blocks[0], "comment": blocks[1:],
                 "order": priority_order(meta), "meta": {str(k): v for k, v in meta.items()}}

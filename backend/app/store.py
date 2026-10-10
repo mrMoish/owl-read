@@ -19,11 +19,15 @@ class Store:
                      date TEXT PRIMARY KEY, content TEXT NOT NULL, fetched_at REAL NOT NULL);
                    CREATE TABLE IF NOT EXISTS daily_es(
                      date TEXT PRIMARY KEY, content TEXT NOT NULL, fetched_at REAL NOT NULL);
+                   CREATE TABLE IF NOT EXISTS daily_en(
+                     date TEXT PRIMARY KEY, content TEXT NOT NULL, fetched_at REAL NOT NULL);
                    CREATE TABLE IF NOT EXISTS translations(
                      key TEXT PRIMARY KEY, es TEXT NOT NULL, created_at REAL NOT NULL);"""
             )
 
     def _table(self, lang: str = "ru"):
+        if lang == "en":
+            return "daily_en"
         return "daily" if lang == "ru" else "daily_es"
 
     def get_daily(self, date: str, lang: str = "ru"):
