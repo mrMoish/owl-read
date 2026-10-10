@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef } from "react";
 import { reorderNodes } from "../lib/swap.js";
 
-function Node({ node, index, translations, onWordClick, meta, registerRef, lang, sourceLang = "ru" }) {
+function Node({ node, index, translations, onWordClick, meta, registerRef, lang }) {
   if (!node) return null;
   if (node.t === "text") return node.s;
   if (node.t === "w") {
@@ -10,7 +10,7 @@ function Node({ node, index, translations, onWordClick, meta, registerRef, lang,
     const info = meta[id] || {};
     const translated = translations[id];
     const content = translated || word;
-    const wordLang = translated ? lang : sourceLang;
+    const wordLang = translated ? lang : "ru";
     return (
       <span
         key={id}
@@ -55,7 +55,6 @@ function Node({ node, index, translations, onWordClick, meta, registerRef, lang,
       meta={meta}
       registerRef={registerRef}
       lang={lang}
-      sourceLang={sourceLang}
     />
   )) : null;
 
@@ -65,7 +64,7 @@ function Node({ node, index, translations, onWordClick, meta, registerRef, lang,
   return <>{children}</>;
 }
 
-export default function RichText({ nodes = [], translations = {}, onWordClick = () => {}, meta = {}, lang = "es", sourceLang = "ru" }) {
+export default function RichText({ nodes = [], translations = {}, onWordClick = () => {}, meta = {}, lang = "es" }) {
   const wordRefs = useRef({});
   const prevRects = useRef({});
 
@@ -131,7 +130,6 @@ export default function RichText({ nodes = [], translations = {}, onWordClick = 
       meta={meta}
       registerRef={registerRef}
       lang={lang}
-      sourceLang={sourceLang}
     />
   ));
 }

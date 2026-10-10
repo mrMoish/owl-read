@@ -14,10 +14,10 @@ from .wol.fetcher import WolError, fetch_wol_page
 log = logging.getLogger("reader")
 
 
-def _resolve_lang(lang_param: str | None, en_param: str | None, es_param: str | None = None) -> str:
+def _resolve_lang(lang_param: str | None, en_param: str | None) -> str:
     if en_param is not None or lang_param == "en":
         return "en"
-    if es_param is not None or lang_param == "es":
+    if lang_param == "es":
         return "es"
     return "ru"
 
@@ -55,10 +55,9 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
     async def get_daily(response: Response,
                         date: str | None = Query(None, pattern=r"^\d{4}-\d{1,2}-\d{1,2}$"),
                         lang: str | None = Query(None),
-                        en: str | None = Query(None),
-                        es: str | None = Query(None)):
+                        en: str | None = Query(None)):
         response.headers["Cache-Control"] = "no-store"
-        active_lang = _resolve_lang(lang, en, es)
+        active_lang = _resolve_lang(lang, en)
         try:
             if active_lang == "en":
                 content, notice = await daily.get_english(date)
@@ -75,10 +74,9 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
     async def make_translations(response: Response,
                                 date: str | None = Query(None, pattern=r"^\d{4}-\d{1,2}-\d{1,2}$"),
                                 lang: str | None = Query(None),
-                                en: str | None = Query(None),
-                                es: str | None = Query(None)):
+                                en: str | None = Query(None)):
         response.headers["Cache-Control"] = "no-store"
-        active_lang = _resolve_lang(lang, en, es)
+        active_lang = _resolve_lang(lang, en)
         try:
             if active_lang == "en":
                 content, notice = await daily.get_english(date)
@@ -114,7 +112,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
             raise HTTPException(400, "word и sentence обязательны")
         if lang == "en" or payload.get("en") is not None:
             active_lang = "en"
-        elif lang == "es" or payload.get("es") is not None:
+        elif lang == "es":
             active_lang = "es"
         else:
             active_lang = "ru"
@@ -149,8 +147,6 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
 
     if s.frontend_dist.exists():
         index_file = s.frontend_dist / "index.html"
-        en_index_file = s.frontend_dist / "en" / "index.html"
-        es_index_file = s.frontend_dist / "es" / "index.html"
         dist_resolved = s.frontend_dist.resolve()
 
         @app.get("/{full_path:path}")
@@ -162,15 +158,6 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
                         return FileResponse(resolved_file)
                 except (ValueError, Exception):
                     pass
-
-            norm_path = full_path.strip("/")
-            if norm_path == "en" or norm_path.startswith("en/"):
-                if en_index_file.is_file():
-                    return FileResponse(en_index_file)
-            if norm_path == "es" or norm_path.startswith("es/"):
-                if es_index_file.is_file():
-                    return FileResponse(es_index_file)
-
             if index_file.is_file():
                 return FileResponse(index_file)
             raise HTTPException(404, "Not Found")
