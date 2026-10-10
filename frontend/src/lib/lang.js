@@ -28,10 +28,10 @@ export function countWordsAndTranslations(nodes = [], translations = {}) {
   return { totalWords, translatedWords };
 }
 
-export function getParagraphLang(nodes = [], translations = {}, targetLang = "es") {
+export function getParagraphLang(nodes = [], translations = {}, targetLang = "ru", sourceLang = "ru") {
   const { totalWords, translatedWords } = countWordsAndTranslations(nodes, translations);
   if (totalWords > 0 && translatedWords / totalWords > 0.5) {
     return targetLang;
   }
-  return "ru";
+  return sourceLang;
 }

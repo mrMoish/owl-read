@@ -6,10 +6,12 @@ const SHELL = `shell-${VERSION}`;
 const PRECACHE = [
   "/",
   "/en/",
+  "/es/",
   "/index.html",
   "/offline.html",
   "/manifest.webmanifest",
   "/manifest-en.webmanifest",
+  "/manifest-es.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png"
 ];
@@ -54,12 +56,13 @@ self.addEventListener("fetch", (e) => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
   if (req.mode === "navigate") {  // сеть первой, чтобы новая версия приложения подхватывалась
+    const navKey = url.pathname.startsWith("/en") ? "/en/index.html" : (url.pathname.startsWith("/es") ? "/es/index.html" : "/index.html");
     e.respondWith(
       // cache: "no-store" — иначе при недоступной сети ответ может прийти из HTTP-кэша
       // браузера под видом успешной сети и перезаписать свежую офлайн-копию оболочки
-      fetch(req, { cache: "no-store" }).then((r) => { if (r.ok) caches.open(SHELL).then((c) => c.put("/index.html", r.clone())); return r; })
+      fetch(req, { cache: "no-store" }).then((r) => { if (r.ok) caches.open(SHELL).then((c) => c.put(navKey, r.clone())); return r; })
         .catch(async () => {
-          const hit = (await caches.match("/index.html")) || (await caches.match("/offline.html"));
+          const hit = (await caches.match(navKey)) || (await caches.match("/index.html")) || (await caches.match("/offline.html"));
           return hit ? serveCached(hit) : Response.error();
         })
     );

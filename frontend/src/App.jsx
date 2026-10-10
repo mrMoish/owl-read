@@ -54,6 +54,7 @@ export default function App() {
   }, [data?.meta, data?.translations, learnedWords]);
 
   const currentLang = langMode || (isEn ? "en" : "ru");
+  const sourceLang = currentLang;
   const targetLang = currentLang === "en" ? "ru" : (currentLang === "es" ? "ru" : "es");
 
   const isStandalone = typeof window !== "undefined" && (
@@ -128,8 +129,8 @@ export default function App() {
         {data ? (
           <article>
             <h1>{data.date_label}</h1>
-            <Scripture block={data.verse} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} lang={targetLang} />
-            <Comment blocks={data.comment} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} lang={targetLang} />
+            <Scripture block={data.verse} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} lang={targetLang} sourceLang={sourceLang} />
+            <Comment blocks={data.comment} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} lang={targetLang} sourceLang={sourceLang} />
             {data.title && <p className="source">{data.title}</p>}
           </article>
         ) : loading ? (
