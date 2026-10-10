@@ -61,13 +61,25 @@ def _plain(nodes) -> str:
     return "".join(n["s"] if n["t"] == "text" else _plain(n.get("c", [])) for n in nodes)
 
 
+def format_text_node(s: str) -> str:
+    if not s:
+        return s
+    s = re.sub(r" +([—–])", "\u00a0\\1", s)
+    s = re.sub(r"\s+([,.\!?:;\)\]\}\»”\…%])", "\\1", s)
+    s = re.sub(r"([«\(\[\{“]) +", "\\1\u00a0", s)
+    return s
+
+
 def _merge(nodes):
     out = []
     for n in nodes:
         if n["t"] == "text" and out and out[-1]["t"] == "text":
-            out[-1] = {"t": "text", "s": out[-1]["s"] + n["s"]}
+            out[-1] = {"t": "text", "s": format_text_node(out[-1]["s"] + n["s"])}
         else:
-            out.append(n)
+            if n["t"] == "text":
+                out.append({"t": "text", "s": format_text_node(n["s"])})
+            else:
+                out.append(n)
     return out
 
 
@@ -96,13 +108,13 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0, lang: str = "ru"):
                         j = judge(m.group(), first, lang=lang)
                     if j:
                         if m.start() > last:
-                            res.append({"t": "text", "s": s[last:m.start()]})
+                            res.append({"t": "text", "s": format_text_node(s[last:m.start()])})
                         res.append({"t": "w", "id": nid, "s": m.group()})
                         meta[nid] = {"w": m.group(), "lemma": j[0], "pos": j[1], "sent": sent}
                         nid += 1
                         last = m.end()
                 if last < len(s):
-                    res.append({"t": "text", "s": s[last:]})
+                    res.append({"t": "text", "s": format_text_node(s[last:])})
                 ctx.pos += len(s)
             return _merge(res)
 

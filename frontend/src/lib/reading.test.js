@@ -8,6 +8,7 @@ import {
 } from "./learned.js";
 
 import { reorderNodes, shouldSwapPair } from "./swap.js";
+import { formatTextNode } from "./punct.js";
 
 import {
   loadLearnedWords,
@@ -654,4 +655,10 @@ test("Additional Word Order Patterns: Ordinal numbers (первый день)", 
   const res = reorderNodes(nodes, translations, meta, "es");
   assert.equal(String(res[0].id), "0"); // primer
   assert.equal(String(res[2].id), "1"); // día
+});
+
+test("formatTextNode converts space before dash to non-breaking space and glues punctuation", () => {
+  assert.equal(formatTextNode("христиане — они"), "христиане\u00A0— они");
+  assert.equal(formatTextNode("слово , которое"), "слово, которое");
+  assert.equal(formatTextNode(" ( « цитата » )"), " (\u00A0«\u00A0цитата»)");
 });

@@ -26,7 +26,7 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 
 /* Interactive words: completely invisible UI, only behavioral interactivity */
 .word {
-  display: inline-block;
+  display: inline;
   padding: 0;
   margin: 0;
   border: none;
@@ -48,6 +48,7 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 .word--swapping {
   z-index: 2;
   position: relative;
+  display: inline-block;
 }
 
 .word:hover {
