@@ -1,9 +1,18 @@
 // Service Worker: кэширует оболочку приложения (HTML/JS/CSS/иконки).
 // Запросы к /api/* НЕ перехватываются: материал дня всегда запрашивается у backend,
 // а офлайн-копию хранит само приложение (localStorage).
-const VERSION = "v4";
+const VERSION = "v5";
 const SHELL = `shell-${VERSION}`;
-const PRECACHE = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const PRECACHE = [
+  "/",
+  "/en/",
+  "/index.html",
+  "/offline.html",
+  "/manifest.webmanifest",
+  "/manifest-en.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png"
+];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
@@ -40,6 +49,7 @@ self.addEventListener("activate", (e) => {
       .then(() => warmBundles())
   );
 });
+
 self.addEventListener("fetch", (e) => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;

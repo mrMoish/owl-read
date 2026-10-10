@@ -16,6 +16,8 @@ import Scripture from "./components/Scripture.jsx";
 import Comment from "./components/Comment.jsx";
 import { useDaily } from "./useDaily.js";
 
+const BUILD_ID = "2026.10.10.v5";
+
 function flattenText(nodes) {
   return nodes.map((n) => {
     if (n.t === "text") return n.s;
@@ -31,9 +33,20 @@ function articleContext(data) {
 }
 
 export default function App() {
-  const { data, loading, error, notice, reload, isEn } = useDaily();
+  const { data, loading, error, notice, reload, isEn, langSource } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
   const [manualTranslations, setManualTranslations] = useState({});
+
+  const [isDebug, setIsDebug] = useState(false);
+  const [swControlled, setSwControlled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setIsDebug(params.has("debug"));
+      setSwControlled(Boolean(navigator.serviceWorker?.controller));
+    }
+  }, []);
 
   useEffect(() => {
     if (!data?.date) return;
@@ -56,6 +69,13 @@ export default function App() {
   }, [data?.meta, data?.translations, learnedWords, manualTranslations]);
 
   const targetLang = isEn ? "en" : "es";
+
+  const isStandalone = typeof window !== "undefined" && (
+    window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true
+  );
+
+  const rawStoredLang = typeof window !== "undefined" ? localStorage.getItem("reader.lang") : null;
+  const lastApiUrl = data?.date ? `/api/daily?date=${data.date}${isEn ? "&en=1" : ""}` : "N/A";
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
     if (!data?.date || !sentence) {
@@ -124,6 +144,20 @@ export default function App() {
   return (
     <>
       <main className="page">
+        {isDebug && (
+          <section className="debug-panel" style={{ background: "#111", color: "#0f0", padding: "12px", borderRadius: "8px", fontSize: "12px", fontFamily: "monospace", marginBottom: "16px", wordBreak: "break-all" }}>
+            <h3>[Diagnostic Panel]</h3>
+            <div><strong>Build ID:</strong> {BUILD_ID}</div>
+            <div><strong>SW Controlled:</strong> {swControlled ? "Yes (active)" : "No"}</div>
+            <div><strong>location.href:</strong> {typeof window !== "undefined" ? window.location.href : ""}</div>
+            <div><strong>Standalone mode:</strong> {isStandalone ? "True (PWA)" : "False (Browser)"}</div>
+            <div><strong>Effective Lang:</strong> {isEn ? "English (en)" : "Spanish (es/default)"}</div>
+            <div><strong>Lang Source:</strong> {langSource}</div>
+            <div><strong>Raw Stored reader.lang:</strong> {rawStoredLang || "null"}</div>
+            <div><strong>Last /api/daily Request:</strong> {lastApiUrl}</div>
+            <div><strong>Response Date / Label:</strong> {data ? `${data.date} (${data.date_label})` : "loading..."}</div>
+          </section>
+        )}
         {notice && <p className="notice" role="status">{notice}</p>}
         {data ? (
           <article>

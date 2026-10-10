@@ -4,6 +4,7 @@
   "lang": "ru",
   "start_url": "/",
   "scope": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#F2F3EE",
   "theme_color": "#0F6B63",

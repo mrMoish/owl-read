@@ -1,1 +1,17 @@
-{ "headers": [{ "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }] }
+{
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    }
+  ],
+  "routes": [
+    { "src": "/sw.js", "headers": { "cache-control": "no-cache" } },
+    { "src": "/manifest-en.webmanifest", "dest": "/manifest-en.webmanifest" },
+    { "src": "/manifest.webmanifest", "dest": "/manifest.webmanifest" },
+    { "handle": "filesystem" },
+    { "src": "/en/(.*)", "dest": "/index.html" },
+    { "src": "/en", "dest": "/index.html" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
