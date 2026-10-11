@@ -11,6 +11,7 @@ import {
 } from "./lib/learned.js";
 import Scripture from "./components/Scripture.jsx";
 import Comment from "./components/Comment.jsx";
+import PronunciationModal from "./components/PronunciationModal.jsx";
 import { useDaily } from "./useDaily.js";
 
 const BUILD_ID = "2026.10.10.v5";
@@ -32,6 +33,7 @@ function articleContext(data) {
 export default function App() {
   const { data, loading, error, notice, reload, isEn, langMode, langSource } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
+  const [pronunciationWordData, setPronunciationWordData] = useState(null);
 
   const [isDebug, setIsDebug] = useState(false);
   const [swControlled, setSwControlled] = useState(false);
@@ -107,6 +109,14 @@ export default function App() {
     setLearnedWords(nextLearned || {});
   };
 
+  const handleWordLongPress = ({ word, lang, rect }) => {
+    setPronunciationWordData({
+      word,
+      lang: lang || currentLang,
+      rect,
+    });
+  };
+
   return (
     <>
       <main className="page">
@@ -128,8 +138,22 @@ export default function App() {
         {data ? (
           <article>
             <h1>{data.date_label}</h1>
-            <Scripture block={data.verse} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} lang={targetLang} />
-            <Comment blocks={data.comment} translations={visibleTranslations} onWordClick={handleWordClick} meta={data.meta || {}} lang={targetLang} />
+            <Scripture
+              block={data.verse}
+              translations={visibleTranslations}
+              onWordClick={handleWordClick}
+              onWordLongPress={handleWordLongPress}
+              meta={data.meta || {}}
+              lang={targetLang}
+            />
+            <Comment
+              blocks={data.comment}
+              translations={visibleTranslations}
+              onWordClick={handleWordClick}
+              onWordLongPress={handleWordLongPress}
+              meta={data.meta || {}}
+              lang={targetLang}
+            />
             {data.title && <p className="source">{data.title}</p>}
           </article>
         ) : loading ? (
@@ -138,6 +162,13 @@ export default function App() {
           <div className="notice"><p>{error}</p><button onClick={reload}>Повторить</button></div>
         )}
       </main>
+
+      {pronunciationWordData && (
+        <PronunciationModal
+          data={pronunciationWordData}
+          onClose={() => setPronunciationWordData(null)}
+        />
+      )}
     </>
   );
 }

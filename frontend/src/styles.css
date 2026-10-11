@@ -42,6 +42,10 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   appearance: none;
   line-height: inherit;
   vertical-align: baseline;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .word:hover {
@@ -89,3 +93,127 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 .panel small { display: block; margin-top: .5rem; color: var(--muted); }
 @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .panel { animation: none; } .fab { transition: none; } }
+
+/* Long press pronunciation modal / popover */
+.pronunciation-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.pronunciation-modal {
+  position: relative;
+  background-color: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 1.1rem 1.35rem;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+  width: 100%;
+  z-index: 101;
+  animation: modalPop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.pronunciation-play-btn {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 0;
+}
+
+.pronunciation-play-btn:hover {
+  transform: scale(1.06);
+}
+
+.pronunciation-play-btn:active {
+  transform: scale(0.96);
+}
+
+.pronunciation-play-btn svg {
+  margin-left: 2px;
+}
+
+.pronunciation-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pronunciation-word-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pronunciation-word {
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+
+.pronunciation-ipa {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  color: var(--accent);
+  font-style: normal;
+}
+
+.pronunciation-ru-hint {
+  font-size: 1.05rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.pronunciation-close-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.pronunciation-close-btn:hover {
+  color: var(--ink);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
