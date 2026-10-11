@@ -219,7 +219,7 @@ function getSpanishPronunciation(word) {
       pieceRu = "ч";
       consumed = 2;
     } else if (c === "l" && next === "l") {
-      pieceRu = "ш";
+      pieceRu = "й";
       consumed = 2;
     } else if (c === "n" && next === "g") {
       pieceRu = "нг";
@@ -264,8 +264,7 @@ function getSpanishPronunciation(word) {
       pieceRu = "нь";
       consumed = 1;
     } else if (c === "y") {
-      const isNextVowel = Boolean(next && vowels.has(next));
-      pieceRu = isNextVowel ? "ш" : "й";
+      pieceRu = (i === charArray.length - 1) ? "й" : "й";
       consumed = 1;
     } else if (c === "r" && next === "r") {
       pieceRu = "р";
@@ -313,7 +312,7 @@ function getSpanishPronunciation(word) {
     if (c === "c" && next === "h") {
       ipaChars.push("tʃ"); curr += 2;
     } else if (c === "l" && next === "l") {
-      ipaChars.push("ʃ"); curr += 2;
+      ipaChars.push("ʝ"); curr += 2;
     } else if (c === "n" && next === "g") {
       ipaChars.push("ŋ"); curr += 2;
     } else if (c === "q" && next === "u") {
@@ -338,9 +337,6 @@ function getSpanishPronunciation(word) {
       curr += 1;
     } else if (c === "ñ") {
       ipaChars.push("ɲ"); curr += 1;
-    } else if (c === "y") {
-      const isNextVowel = Boolean(next && vowels.has(next));
-      ipaChars.push(isNextVowel ? "ʃ" : "j"); curr += 1;
     } else if (c === "r" && next === "r") {
       ipaChars.push("r"); curr += 2;
     } else if (c === "r") {

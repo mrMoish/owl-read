@@ -354,7 +354,7 @@ def test_tts_endpoint(tmp_path):
         assert captured["url"] == "https://openrouter.ai/api/v1/audio/speech"
         assert captured["body"]["model"] == "x-ai/grok-voice-tts-1.0"
         assert captured["body"]["voice"] == "eve"
-        assert captured["body"]["input"] == "esposos"
+        assert captured["body"]["input"] == "«esposos»"
         assert data["audio_b64"] == base64.b64encode(b"dummy audio binary").decode("ascii")
         assert data["format"] == "mp3"
     finally:
