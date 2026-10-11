@@ -101,7 +101,6 @@ class EpubBrochureManager:
                 log.error("[EPUB Fetch Error] %s", err_msg)
                 raise EpubError(err_msg)
 
-            # Пишем во временный файл и атомарно переименовываем
             tmp_path = dest_path.with_suffix(".tmp")
             tmp_path.write_bytes(dl_res.content)
             tmp_path.replace(dest_path)
@@ -202,17 +201,29 @@ class EpubBrochureManager:
                     log.error("[EPUB Parse Error] %s", err_msg)
                     raise EpubError(err_msg)
 
-                # Парсинг структуры заголовок / стих / комментарий
+                # Ищем заголовок конкретно для запрашиваемого дня, чтобы изолировать блок дня в мультидневных файлах
                 title = f"{day_num} {month_name.capitalize()}"
                 date_label = ""
-                header = target_soup.find("header") or target_soup.find(["h1", "h2", "h3"])
-                if header:
-                    date_label = header.get_text().strip()
+                day_container = None
+
+                for candidate_h in target_soup.find_all(["header", "h1", "h2", "h3", "h4", "p"]):
+                    cand_text = candidate_h.get_text().strip().lower()
+                    if re.search(pattern, cand_text):
+                        date_label = candidate_h.get_text().strip()
+                        day_container = candidate_h.find_parent(["article", "section", "div"]) or candidate_h.parent
+                        break
+
+                search_context = day_container or target_soup
+
+                if not date_label:
+                    header = search_context.find("header") or search_context.find(["h1", "h2", "h3"])
+                    if header:
+                        date_label = header.get_text().strip()
 
                 verse_text = ""
-                verse_elem = target_soup.find("p", class_=re.compile(r"themeScrp|scrp"))
+                verse_elem = search_context.find("p", class_=re.compile(r"themeScrp|scrp"))
                 if not verse_elem:
-                    for p in target_soup.find_all("p"):
+                    for p in search_context.find_all("p"):
                         if p.find("em") or p.find("a"):
                             verse_elem = p
                             break
@@ -221,7 +232,7 @@ class EpubBrochureManager:
                     verse_text = verse_elem.get_text().strip()
 
                 comment_paragraphs = []
-                body_div = target_soup.find("div", class_=re.compile(r"bodyTxt|pGroup|section"))
+                body_div = search_context.find("div", class_=re.compile(r"bodyTxt|pGroup|section"))
                 if body_div:
                     for p in body_div.find_all("p"):
                         if p != verse_elem:
@@ -230,7 +241,7 @@ class EpubBrochureManager:
                                 comment_paragraphs.append(t)
 
                 if not comment_paragraphs:
-                    for p in target_soup.find_all("p"):
+                    for p in search_context.find_all("p"):
                         if p != verse_elem:
                             t = p.get_text().strip()
                             if t and not (date_label and t in date_label):

@@ -1,4 +1,4 @@
-import asyncio, json, logging
+import asyncio, json, logging, zipfile
 from dataclasses import replace
 from datetime import date, datetime, timezone, timedelta
 import httpx
@@ -231,3 +231,32 @@ def test_server_logging_failure_scenario(tmp_path, caplog):
     logs = caplog.text
     assert "[DailyService EpubError]" in logs
     assert "HTTP 500 Test Error" in logs
+
+
+def test_real_epub_parser_multi_day(tmp_path):
+    """Проверяет парсер EPUB на реальном структурированном XHTML zip-архиве с несколькими днями."""
+    epub_file = tmp_path / "es26_ru.epub"
+    html_content = """<!DOCTYPE html>
+<html>
+<body>
+  <article>
+    <header><h1>5 октября</h1></header>
+    <p class="themeScrp">Стих за 5 октября</p>
+    <div class="bodyTxt"><p>Комментарий за 5 октября</p></div>
+  </article>
+  <article>
+    <header><h1>6 октября</h1></header>
+    <p class="themeScrp">«Закон — это лишь тень» (Евр. 10:1).</p>
+    <div class="bodyTxt"><p>Христианам в Иудее приходилось нелегко.</p></div>
+  </article>
+</body>
+</html>"""
+
+    with zipfile.ZipFile(epub_file, "w") as z:
+        z.writestr("OEBPS/content_oct.xhtml", html_content)
+
+    mgr = EpubBrochureManager(storage_dir=tmp_path)
+    res = mgr.parse_entry_from_epub(epub_file, date(2026, 10, 6), lang="ru")
+    assert res["date_label"] == "6 октября"
+    assert "Закон — это лишь тень" in res["verse"]
+    assert "Христианам в Иудее" in res["comment"][0]
