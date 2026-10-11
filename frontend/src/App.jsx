@@ -56,6 +56,7 @@ export default function App() {
   }, [data?.meta, data?.translations, learnedWords]);
 
   const currentLang = langMode || (isEn ? "en" : "ru");
+  const sourceLang = currentLang;
   const targetLang = currentLang === "en" ? "ru" : (currentLang === "es" ? "ru" : "es");
 
   const isStandalone = typeof window !== "undefined" && (
@@ -109,10 +110,11 @@ export default function App() {
     setLearnedWords(nextLearned || {});
   };
 
-  const handleWordLongPress = ({ word, lang, rect }) => {
+  const handleWordLongPress = ({ word, sentence, lang, rect }) => {
     setPronunciationWordData({
       word,
-      lang: lang || targetLang,
+      sentence,
+      lang: lang || sourceLang,
       rect,
     });
   };
@@ -144,6 +146,8 @@ export default function App() {
               onWordClick={handleWordClick}
               onWordLongPress={handleWordLongPress}
               meta={data.meta || {}}
+              sourceLang={sourceLang}
+              targetLang={targetLang}
               lang={targetLang}
             />
             <Comment
@@ -152,6 +156,8 @@ export default function App() {
               onWordClick={handleWordClick}
               onWordLongPress={handleWordLongPress}
               meta={data.meta || {}}
+              sourceLang={sourceLang}
+              targetLang={targetLang}
               lang={targetLang}
             />
             {data.title && <p className="source">{data.title}</p>}

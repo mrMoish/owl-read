@@ -348,15 +348,52 @@ def test_tts_endpoint(tmp_path):
         s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="key")
         app = create_app(s)
         c = TestClient(app)
-        res = c.post("/api/tts", json={"word": "esposos", "lang": "es"})
-        assert res.status_code == 200
-        data = res.json()
+
+        # Spanish TTS test
+        res_es = c.post("/api/tts", json={"word": "esposos", "sentence": "Los esposos se aman.", "lang": "es"})
+        assert res_es.status_code == 200
+        data_es = res_es.json()
         assert captured["url"] == "https://openrouter.ai/api/v1/audio/speech"
         assert captured["body"]["model"] == "x-ai/grok-voice-tts-1.0"
         assert captured["body"]["voice"] == "eve"
-        assert captured["body"]["input"] == "esposos"
-        assert data["audio_b64"] == base64.b64encode(b"dummy audio binary").decode("ascii")
-        assert data["format"] == "mp3"
+        assert captured["body"]["input"] == "«esposos»"
+        assert data_es["audio_b64"] == base64.b64encode(b"dummy audio binary").decode("ascii")
+
+        # English TTS test
+        res_en = c.post("/api/tts", json={"word": "love", "sentence": "Love is patient.", "lang": "en"})
+        assert res_en.status_code == 200
+        assert captured["body"]["input"] == '"love"'
+
+        # Russian TTS test
+        res_ru = c.post("/api/tts", json={"word": "любовь", "sentence": "Любовь долготерпит.", "lang": "ru"})
+        assert res_ru.status_code == 200
+        assert captured["body"]["input"] == "любовь"
+    finally:
+        o.OpenRouterClient.__init__ = orig
+
+
+def test_pronunciation_endpoint(tmp_path):
+    captured_messages = []
+    def handler(request):
+        payload = json.loads(request.content)
+        captured_messages.append(payload["messages"])
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": json.dumps({"ipa": "[esˈposos]", "ru_hint": "эспо́сос"})}}]
+        })
+
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    orig = o.OpenRouterClient.__init__
+    def init(self, k, m, h=None): orig(self, k, m, http)
+    o.OpenRouterClient.__init__ = init
+    try:
+        s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="key")
+        app = create_app(s)
+        c = TestClient(app)
+        res = c.post("/api/pronunciation", json={"word": "esposos", "sentence": "Los esposos se quieren.", "lang": "es"})
+        assert res.status_code == 200
+        assert res.json() == {"word": "esposos", "ipa": "[esˈposos]", "ru_hint": "эспо́сос"}
+        assert "standard Spanish" in captured_messages[0][0]["content"]
     finally:
         o.OpenRouterClient.__init__ = orig
 

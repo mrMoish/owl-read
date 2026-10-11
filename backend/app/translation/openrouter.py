@@ -82,6 +82,13 @@ SYSTEM_PRONUNCIATION = (
     "2) ru_hint: natural Russian pronunciation hint with stress mark (\u0301) on the stressed vowel. "
     "Return JSON only: {\"ipa\": \"[...]\", \"ru_hint\": \"...\"}"
 )
+SYSTEM_PRONUNCIATION_ES = (
+    "You are a linguistic expert and phonetician specializing in standard Spanish. "
+    "For the given target word in its sentence context, generate: "
+    "1) ipa: standard IPA phonetic transcription inside brackets [ ... ] "
+    "2) ru_hint: natural Russian pronunciation hint with stress mark (\u0301) on the stressed vowel. "
+    "Return JSON only: {\"ipa\": \"[...]\", \"ru_hint\": \"...\"}"
+)
 
 
 class TranslationError(Exception):
@@ -144,11 +151,12 @@ class OpenRouterClient:
     def __init__(self, api_key: str, model: str, http: httpx.AsyncClient | None = None):
         self.api_key, self.model, self._http = api_key, model, http
 
-    async def generate_tts(self, *, word: str, lang: str = "es") -> dict[str, str]:
+    async def generate_tts(self, *, word: str, sentence: str = "", lang: str = "es") -> dict[str, str]:
         import base64
+        input_text = f"«{word}»" if lang == "es" else (f'"{word}"' if lang == "en" else word)
         body = {
             "model": "x-ai/grok-voice-tts-1.0",
-            "input": word,
+            "input": input_text,
             "voice": "eve",
             "response_format": "mp3",
         }
@@ -181,12 +189,13 @@ class OpenRouterClient:
 
     async def generate_pronunciation(self, *, word: str, sentence: str, lang: str = "es") -> dict[str, str]:
         payload = {"word": word, "sentence": sentence, "language": lang}
+        system_prompt = SYSTEM_PRONUNCIATION_ES if lang == "es" else SYSTEM_PRONUNCIATION
         body = {
             "model": self.model,
             "temperature": 0.1,
             "response_format": {"type": "json_object"},
             "messages": [
-                {"role": "system", "content": SYSTEM_PRONUNCIATION},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
         }

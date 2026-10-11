@@ -4,11 +4,11 @@
  */
 import { fetchPronunciation, fetchTtsAudio } from "../api.js";
 
-export async function speakWord(text, lang = "es") {
+export async function speakWord(text, lang = "es", sentence = "") {
   const clean = text.trim();
   if (!clean) return;
   try {
-    const res = await fetchTtsAudio({ word: clean, lang });
+    const res = await fetchTtsAudio({ word: clean, sentence, lang });
     if (res && res.audio_b64) {
       const mime = res.format === "mp3" ? "audio/mp3" : "audio/wav";
       const audio = new Audio(`data:${mime};base64,${res.audio_b64}`);
@@ -203,7 +203,7 @@ function getSpanishPronunciation(word) {
     }
   }
 
-  // Build Russian Hint
+  // Build Russian Hint (Standard Spanish)
   let ru = "";
   let i = 0;
   while (i < charArray.length) {

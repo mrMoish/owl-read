@@ -16,6 +16,22 @@ test("Spanish pronunciation generation: IPA and Russian hint", () => {
   assert.ok(p3.ruHint.length > 0);
 });
 
+test("Spanish pronunciation rules for ll and y", () => {
+  const p1 = getPronunciation("llamar", "es");
+  assert.ok(p1.ipa.includes("ʝ"), "IPA for llamar should use [ʝ]");
+  assert.ok(p1.ruHint.includes("й"), "Russian hint for llamar should use 'й'");
+
+  const p2 = getPronunciation("calle", "es");
+  assert.ok(p2.ipa.includes("ʝ"), "IPA for calle should use [ʝ]");
+  assert.ok(p2.ruHint.includes("й"), "Russian hint for calle should use 'й'");
+
+  const p3 = getPronunciation("yo", "es");
+  assert.ok(p3.ruHint.includes("й"), "Russian hint for yo should use 'й'");
+
+  const p4 = getPronunciation("rey", "es");
+  assert.ok(p4.ruHint.includes("й"), "Russian hint for rey should keep 'й' at the end");
+});
+
 test("English pronunciation generation: IPA and Russian hint", () => {
   const p1 = getPronunciation("the", "en");
   assert.equal(p1.ipa, "[ðə]");

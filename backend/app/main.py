@@ -149,10 +149,11 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
     async def get_tts(response: Response, payload: dict):
         response.headers["Cache-Control"] = "no-store"
         word = str(payload.get("word", "")).strip()
+        sentence = str(payload.get("sentence", "")).strip()
         lang = str(payload.get("lang") or "es").strip()
         if not word:
             raise HTTPException(400, "word обязателен")
-        res = await tr.generate_tts(word=word, lang=lang)
+        res = await tr.generate_tts(word=word, sentence=sentence, lang=lang)
         if not res:
             raise HTTPException(503, "TTS недоступен")
         return {"audio_b64": res.get("audio_b64", ""), "format": res.get("format", "mp3")}
