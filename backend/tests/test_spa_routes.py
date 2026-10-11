@@ -31,6 +31,12 @@ def test_spa_route_serving():
         assert r_root.status_code == 200
         assert "Daily Reader" in r_root.text
 
+        # /s1, /s2, /s3, /s4 paths serving SPA index.html
+        for mode_route in ("/s1/", "/s2/", "/s3/", "/s4/"):
+            r_mode = client.get(mode_route)
+            assert r_mode.status_code == 200
+            assert "Daily Reader" in r_mode.text
+
         # /en path serving SPA index.html
         r_en = client.get("/en/")
         assert r_en.status_code == 200

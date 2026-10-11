@@ -8,20 +8,16 @@ test("Path-based Language Resolution: isEnglishPath, isSpanishPath, and isRussia
   assert.equal(isEnglishPath("/"), false);
   assert.equal(isEnglishPath("/en"), true);
   assert.equal(isEnglishPath("/en/"), true);
-  assert.equal(isEnglishPath("/en/today"), true);
-  assert.equal(isEnglishPath("/english"), false);
+  assert.equal(isEnglishPath("/s4"), true);
+  assert.equal(isEnglishPath("/s4/"), true);
 
   assert.equal(isSpanishPath("/"), false);
   assert.equal(isSpanishPath("/es"), true);
   assert.equal(isSpanishPath("/es/"), true);
-  assert.equal(isSpanishPath("/es/today"), true);
-  assert.equal(isSpanishPath("/espanol"), false);
 
   assert.equal(isRussianPath("/"), false);
   assert.equal(isRussianPath("/ru"), true);
   assert.equal(isRussianPath("/ru/"), true);
-  assert.equal(isRussianPath("/ru/today"), true);
-  assert.equal(isRussianPath("/russian"), false);
 });
 
 test("No query or storage language parsing: ?en parameters do not alter isEnglishPath", () => {

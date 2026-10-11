@@ -4,7 +4,6 @@ import {
   loadLearnedWords,
   addLearnedWord,
   removeLearnedWord,
-  loadUserSettings,
 } from "./lib/storage.js";
 import {
   normalizeLemma,
@@ -17,7 +16,7 @@ import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
 import { transliterateBlock } from "./lib/transliteration.js";
 
-const BUILD_ID = "2026.10.10.v6";
+const BUILD_ID = "2026.10.10.v7";
 
 function flattenText(nodes) {
   return nodes.map((n) => {
@@ -34,13 +33,12 @@ function articleContext(data) {
 }
 
 export default function App() {
-  const { data, loading, error, notice, reload, isEn, langMode, langSource } = useDaily();
+  const { data, loading, error, notice, reload, mode } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
   const [pronunciationWordData, setPronunciationWordData] = useState(null);
 
   const [isDebug, setIsDebug] = useState(false);
   const [swControlled, setSwControlled] = useState(false);
-  const [userSettings, setUserSettings] = useState(() => loadUserSettings());
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -59,26 +57,25 @@ export default function App() {
     });
   }, [data?.meta, data?.translations, learnedWords]);
 
-  const currentLang = langMode || (isEn ? "en" : "ru");
-  const sourceLang = currentLang;
-  const targetLang = currentLang === "en" ? "ru" : (currentLang === "es" ? "ru" : "es");
+  const sourceLang = mode.source;
+  const targetLang = mode.target;
 
-  // Транслитерация если включена опция noAlphabet
+  // Отображение с транслитерацией если режим требует ее (например, S3)
   const displayVerse = useMemo(() => {
     if (!data?.verse) return null;
-    if (userSettings?.noAlphabet) {
+    if (mode.transliterate) {
       return transliterateBlock(data.verse, sourceLang, targetLang);
     }
     return data.verse;
-  }, [data?.verse, userSettings?.noAlphabet, sourceLang, targetLang]);
+  }, [data?.verse, mode.transliterate, sourceLang, targetLang]);
 
   const displayComment = useMemo(() => {
     if (!data?.comment) return [];
-    if (userSettings?.noAlphabet) {
+    if (mode.transliterate) {
       return data.comment.map((b) => transliterateBlock(b, sourceLang, targetLang));
     }
     return data.comment;
-  }, [data?.comment, userSettings?.noAlphabet, sourceLang, targetLang]);
+  }, [data?.comment, mode.transliterate, sourceLang, targetLang]);
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
     if (!data?.date || !sentence) {
@@ -103,7 +100,7 @@ export default function App() {
           sentence,
           context: context || articleContext(data),
           date: data.date,
-          lang: currentLang,
+          lang: sourceLang,
         };
         const res = await translateWord(payload);
         translated = res?.translation || res?.original || word;
@@ -143,7 +140,10 @@ export default function App() {
             <h3>[Diagnostic Panel]</h3>
             <div><strong>Build ID:</strong> {BUILD_ID}</div>
             <div><strong>SW Controlled:</strong> {swControlled ? "Yes (active)" : "No"}</div>
-            <div><strong>Effective Lang:</strong> {currentLang}</div>
+            <div><strong>Active Mode ID:</strong> {mode.id} ({mode.pair})</div>
+            <div><strong>Source Lang:</strong> {sourceLang}</div>
+            <div><strong>Target Lang:</strong> {targetLang}</div>
+            <div><strong>Transliteration:</strong> {mode.transliterate ? "On" : "Off"}</div>
           </section>
         )}
         {notice && <p className="notice" role="status">{notice}</p>}
@@ -176,13 +176,13 @@ export default function App() {
           </article>
         ) : loading ? (
           <p className="notice" role="status">
-            {targetLang === "es" ? "Cargando el texto del día…" : (currentLang === "en" ? "Loading daily text…" : "Загружаю материал дня…")}
+            {targetLang === "es" ? "Cargando el texto del día…" : (sourceLang === "en" ? "Loading daily text…" : "Загружаю материал дня…")}
           </p>
         ) : (
           <div className="notice">
             <p>{error}</p>
             <button onClick={reload}>
-              {targetLang === "es" ? "Reintentar" : (currentLang === "en" ? "Retry" : "Повторить")}
+              {targetLang === "es" ? "Reintentar" : (sourceLang === "en" ? "Retry" : "Повторить")}
             </button>
           </div>
         )}

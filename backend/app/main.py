@@ -242,7 +242,7 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
                         return FileResponse(resolved_file)
                 except (ValueError, Exception):
                     pass
-                for lang_prefix in ("en", "es", "ru"):
+                for lang_prefix in ("en", "es", "ru", "s1", "s2", "s3", "s4"):
                     if full_path == lang_prefix or full_path.startswith(f"{lang_prefix}/"):
                         lang_index = s.frontend_dist / lang_prefix / "index.html"
                         if lang_index.is_file():
