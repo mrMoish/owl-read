@@ -332,18 +332,13 @@ def test_format_text_node_and_analyzer_punctuation_binding():
 
 
 def test_tts_endpoint(tmp_path):
+    captured = {}
     def handler(request):
-        return httpx.Response(200, json={
-            "choices": [{
-                "message": {
-                    "audio": {
-                        "data": "ZHVtbXkgYXVkaW8=",
-                        "format": "mp3"
-                    }
-                }
-            }]
-        })
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, content=b"dummy audio binary", headers={"Content-Type": "audio/mpeg"})
 
+    import base64
     import app.translation.openrouter as o
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     orig = o.OpenRouterClient.__init__
@@ -356,7 +351,10 @@ def test_tts_endpoint(tmp_path):
         res = c.post("/api/tts", json={"word": "esposos", "lang": "es"})
         assert res.status_code == 200
         data = res.json()
-        assert data["audio_b64"] == "ZHVtbXkgYXVkaW8="
+        assert captured["url"] == "https://openrouter.ai/api/v1/audio/speech"
+        assert captured["body"]["model"] == "openai/gpt-audio-mini"
+        assert captured["body"]["input"] == "esposos"
+        assert data["audio_b64"] == base64.b64encode(b"dummy audio binary").decode("ascii")
         assert data["format"] == "mp3"
     finally:
         o.OpenRouterClient.__init__ = orig

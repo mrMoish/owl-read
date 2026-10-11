@@ -8,6 +8,7 @@ import httpx
 
 log = logging.getLogger("uvicorn.error")
 URL = "https://openrouter.ai/api/v1/chat/completions"
+TTS_URL = "https://openrouter.ai/api/v1/audio/speech"
 CYR = re.compile(r"[А-Яа-яЁё]")
 
 SYSTEM_RU_ES = (
@@ -140,29 +141,27 @@ class OpenRouterClient:
         self.api_key, self.model, self._http = api_key, model, http
 
     async def generate_tts(self, *, word: str, lang: str = "es") -> dict[str, str]:
-        prompt = f"Say the word clearly in {lang} pronunciation: {word}"
+        import base64
         body = {
             "model": "openai/gpt-audio-mini",
-            "modalities": ["text", "audio"],
-            "audio": {"voice": "alloy", "format": "mp3"},
-            "messages": [
-                {"role": "user", "content": prompt},
-            ],
+            "input": word,
+            "voice": "alloy",
+            "response_format": "mp3",
         }
         headers = {"Authorization": f"Bearer {self.api_key}", "X-Title": "Daily Reader"}
         own = self._http is None
         http = self._http or httpx.AsyncClient(timeout=30)
         try:
-            r = await http.post(URL, json=body, headers=headers)
+            r = await http.post(TTS_URL, json=body, headers=headers)
+            if not r.is_success:
+                err_text = r.text[:300].replace("\n", " ")
+                log.warning("OpenRouter TTS endpoint HTTP %s: %s", r.status_code, err_text)
             r.raise_for_status()
-            res_json = r.json()
-            message = res_json["choices"][0]["message"]
-            audio_info = message.get("audio") or {}
-            audio_b64 = audio_info.get("data", "")
-            audio_format = audio_info.get("format", "mp3")
-            if not audio_b64:
-                raise TranslationError("No audio returned from model")
-            return {"audio_b64": audio_b64, "format": audio_format}
+            audio_bytes = r.content
+            if not audio_bytes:
+                raise TranslationError("No audio content returned from TTS model")
+            audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
+            return {"audio_b64": audio_b64, "format": "mp3"}
         except Exception as e:
             log.warning("generate_tts failed: %s", e)
             raise TranslationError(f"TTS generation failed: {e}") from e
