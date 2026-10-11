@@ -387,3 +387,19 @@ def test_tts_endpoint_404_handling(tmp_path, caplog):
     assert "eve" in logs
     assert "404" in logs
     assert "secret-key-12345" not in logs
+
+
+def test_phrase_tokenization_and_multiword_translation():
+    """Проверяет токенизацию устойчивых фраз (например, 'ni siquiera') и поддержку многословного перевода глаголов."""
+    es_blocks = [{"nodes": [{"t": "text", "s": "Quizás Jehová ni siquiera escuche sus oraciones."}]}]
+    out, meta, _ = analyze_blocks(es_blocks, lang="es")
+    words = [n["s"] for n in out[0]["nodes"] if n["t"] == "w"]
+    assert "ni siquiera" in words
+    phrase_id = [k for k, v in meta.items() if v["w"] == "ni siquiera"][0]
+    assert meta[phrase_id]["lemma"] == "ni siquiera"
+
+    # Проверяем также случай с заглавной буквой
+    es_caps_blocks = [{"nodes": [{"t": "text", "s": "Ni siquiera escuchó."}]}]
+    out_caps, meta_caps, _ = analyze_blocks(es_caps_blocks, lang="es")
+    words_caps = [n["s"] for n in out_caps[0]["nodes"] if n["t"] == "w"]
+    assert "Ni siquiera" in words_caps
