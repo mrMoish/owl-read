@@ -3,17 +3,20 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-test("ModeSelector component renders all three mode paths", () => {
+test("ModeSelector component renders S1, S2, S3, S4 mode links", () => {
   const fileContent = fs.readFileSync(
     path.resolve(process.cwd(), "src/components/ModeSelector.jsx"),
     "utf8"
   );
 
-  assert.match(fileContent, /path:\s*["']\/ru\/["']/);
-  assert.match(fileContent, /path:\s*["']\/es\/["']/);
-  assert.match(fileContent, /path:\s*["']\/en\/["']/);
+  const modesContent = fs.readFileSync(
+    path.resolve(process.cwd(), "src/lib/modes.js"),
+    "utf8"
+  );
 
-  assert.match(fileContent, /es\s*→\s*ru/);
-  assert.match(fileContent, /ru\s*→\s*es/);
-  assert.match(fileContent, /en\s*→\s*ru/);
+  assert.match(modesContent, /\/s1\//);
+  assert.match(modesContent, /\/s2\//);
+  assert.match(modesContent, /\/s3\//);
+  assert.match(modesContent, /\/s4\//);
+  assert.match(fileContent, /MODES\.s1/);
 });

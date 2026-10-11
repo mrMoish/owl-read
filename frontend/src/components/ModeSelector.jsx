@@ -1,32 +1,8 @@
 import React from "react";
+import { MODES } from "../lib/modes.js";
 
 export default function ModeSelector() {
-  const modes = [
-    {
-      id: "es-ru",
-      pair: "es → ru",
-      title: "Para hispanohablantes",
-      subtitle: "Испаноговорящие учат русский",
-      description: "Lectura diaria en ruso con traducción al español al tocar cada palabra.",
-      path: "/ru/",
-    },
-    {
-      id: "ru-es",
-      pair: "ru → es",
-      title: "Для русскоговорящих",
-      subtitle: "Русскоговорящие учат испанский",
-      description: "Ежедневное чтение на испанском с переводом на русский при нажатии на слова.",
-      path: "/es/",
-    },
-    {
-      id: "en-ru",
-      pair: "en → ru",
-      title: "Для русскоговорящих",
-      subtitle: "Русскоговорящие учат английский",
-      description: "Ежедневное чтение на английском с переводом на русский при нажатии на слова.",
-      path: "/en/",
-    },
-  ];
+  const modesList = [MODES.s1, MODES.s2, MODES.s3, MODES.s4];
 
   return (
     <div className="mode-selector-page">
@@ -38,7 +14,7 @@ export default function ModeSelector() {
       </header>
 
       <div className="mode-cards-grid">
-        {modes.map((mode) => (
+        {modesList.map((mode) => (
           <a
             key={mode.id}
             href={mode.path}

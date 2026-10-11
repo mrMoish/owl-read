@@ -68,3 +68,14 @@ export const saveDaily = (d, lang = "ru") => safe(() => {
   const key = lang === "en" ? "reader.daily.en" : (lang === "es" ? "reader.daily.es" : "reader.daily");
   localStorage.setItem(key, JSON.stringify(d));
 });
+
+export const loadUserSettings = () => safe(() => {
+  return JSON.parse(localStorage.getItem("reader.settings") || "{}");
+}, {});
+
+export const saveUserSettings = (settings) => safe(() => {
+  const current = loadUserSettings();
+  const updated = { ...current, ...settings };
+  localStorage.setItem("reader.settings", JSON.stringify(updated));
+  return updated;
+});

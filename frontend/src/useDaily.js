@@ -1,24 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchDaily, requestTranslations } from "./api.js";
+import { fetchDaily, requestTranslations, syncBrochure } from "./api.js";
 import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
 import { initialData, offlineState } from "./lib/offline.js";
-import { isEnglishPath, isSpanishPath, isRussianPath } from "./lib/language.js";
-
-export function isEnglishMode() {
-  if (typeof window !== "undefined" && window.location?.pathname) {
-    return isEnglishPath(window.location.pathname);
-  }
-  return false;
-}
-
-export function activeLangMode() {
-  if (typeof window !== "undefined" && window.location?.pathname) {
-    if (isEnglishPath(window.location.pathname)) return "en";
-    if (isSpanishPath(window.location.pathname)) return "es";
-    if (isRussianPath(window.location.pathname)) return "ru";
-  }
-  return "ru";
-}
+import { activeMode, getModeByPath } from "./lib/modes.js";
 
 function activeDate() {
   if (typeof window !== "undefined" && window.location?.search) {
@@ -28,14 +12,16 @@ function activeDate() {
   return localDate();
 }
 
-/** При каждом запуске грузит материал дня и заранее подготавливает переводы. */
+/** При каждом запуске грузит материал дня для активного режима чтения. */
 export function useDaily() {
-  const langMode = activeLangMode();
+  const mode = activeMode();
+  const langMode = mode.source;
   const isEn = langMode === "en";
+
   const [state, setState] = useState(() => {
     const cached = loadDaily(langMode);
     const target = activeDate();
-    return { data: initialData(cached, target), loading: true, error: null, notice: null, isEn, langMode };
+    return { data: initialData(cached, target), loading: true, error: null, notice: null, isEn, langMode, mode };
   });
   const busy = useRef(false);
 
@@ -43,15 +29,22 @@ export function useDaily() {
     if (busy.current) return;
     busy.current = true;
     const date = activeDate();
-    const langKey = langMode;
-    setState((s) => ({ ...s, loading: true, error: null }));
+    const currentMode = activeMode();
+    const langKey = currentMode.source;
+
+    setState((s) => ({ ...s, loading: true, error: null, mode: currentMode }));
+
+    // Автоматическая подгрузка/проверка брошюры для языка источника режима
+    syncBrochure(langKey).catch(() => {});
+
     try {
-      let data = await fetchDaily(date, langMode);
+      let data = await fetchDaily(date, langKey);
       saveDaily(data, langKey);
-      setState({ data, loading: false, error: null, notice: data.notice, isEn: langMode === "en", langMode });
+      setState({ data, loading: false, error: null, notice: data.notice, isEn: langKey === "en", langMode: langKey, mode: currentMode });
+
       if (data.translations_status === "pending" || data.translations_status === "partial") {
         try {
-          const t = await requestTranslations(date, langMode);
+          const t = await requestTranslations(date, langKey);
           data = {
             ...data,
             translations: { ...(data.translations || {}), ...(t.translations || {}) },
@@ -70,7 +63,7 @@ export function useDaily() {
         ...offlineState({ shownData: s.data, cached: loadDaily(langKey), targetDate: date }),
       }));
     } finally { busy.current = false; }
-  }, [langMode]);
+  }, []);
 
   useEffect(() => {
     load();
