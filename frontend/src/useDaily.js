@@ -47,8 +47,14 @@ export function useDaily() {
     try {
       let data = await fetchDaily(date, langMode);
       saveDaily(data, langKey);
-      setState({ data, loading: false, error: null, notice: data.notice, isEn: langMode === "en", langMode });
-      if (data.translations_status === "pending" || data.translations_status === "partial") {
+      const isTranslating = data.translations_status === "pending" || data.translations_status === "partial";
+      const initialNotice = isTranslating
+        ? (data.notice ? `${data.notice} | Загрузка перевода…` : "Загрузка перевода…")
+        : data.notice;
+
+      setState({ data, loading: false, error: null, notice: initialNotice, isEn: langMode === "en", langMode });
+
+      if (isTranslating) {
         try {
           const t = await requestTranslations(date, langMode);
           data = {
@@ -57,9 +63,10 @@ export function useDaily() {
             translations_status: t.translations_status,
           };
           saveDaily(data, langKey);
-          setState((s) => ({ ...s, data }));
+          setState((s) => ({ ...s, data, notice: data.notice || null }));
         } catch {
-          // Если фоновый перевод не удался, слова останутся исходными
+          // Если фоновый перевод не удался, сбрасываем надпись о загрузке перевода
+          setState((s) => ({ ...s, notice: data.notice || null }));
         }
       }
     } catch (e) {
