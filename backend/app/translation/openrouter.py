@@ -9,6 +9,7 @@ import httpx
 log = logging.getLogger("uvicorn.error")
 URL = "https://openrouter.ai/api/v1/chat/completions"
 CYR = re.compile(r"[А-Яа-яЁё]")
+
 SYSTEM_RU_ES = (
     "You translate single Russian words, as used in a given sentence, into Argentine Spanish (es-AR) "
     "for a language-learning reader. For each item return the Spanish word or short phrase (max 3 words) "
@@ -69,6 +70,14 @@ SINGLE_SYSTEM_EN_RU = (
     "If the translation is uncertain, return the original word rather than a broader phrase."
 )
 
+SYSTEM_PRONUNCIATION = (
+    "You are a linguistic expert and phonetician. "
+    "For the given target word in its sentence context, generate: "
+    "1) ipa: standard IPA phonetic transcription inside brackets [ ... ] "
+    "2) ru_hint: natural Russian pronunciation hint with stress mark (\u0301) on the stressed vowel. "
+    "Return JSON only: {\"ipa\": \"[...]\", \"ru_hint\": \"...\"}"
+)
+
 
 class TranslationError(Exception):
     pass
@@ -115,9 +124,49 @@ def parse_single_response(text: str, lang: str = "ru") -> str:
         raise TranslationError(f"Некорректный JSON от модели: {e}") from e
 
 
+def parse_pronunciation_response(text: str) -> dict[str, str]:
+    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+    try:
+        data = json.loads(text)
+        ipa = str(data.get("ipa", "")).strip()
+        ru_hint = str(data.get("ru_hint") or data.get("ruHint") or "").strip()
+        return {"ipa": ipa, "ru_hint": ru_hint}
+    except (ValueError, TypeError, KeyError) as e:
+        raise TranslationError(f"Invalid JSON from pronunciation model: {e}") from e
+
+
 class OpenRouterClient:
     def __init__(self, api_key: str, model: str, http: httpx.AsyncClient | None = None):
         self.api_key, self.model, self._http = api_key, model, http
+
+    async def generate_pronunciation(self, *, word: str, sentence: str, lang: str = "es") -> dict[str, str]:
+        payload = {"word": word, "sentence": sentence, "language": lang}
+        body = {
+            "model": self.model,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": SYSTEM_PRONUNCIATION},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "X-Title": "Daily Reader"}
+        own = self._http is None
+        http = self._http or httpx.AsyncClient(timeout=30)
+        try:
+            r = await http.post(URL, json=body, headers=headers)
+            if r.status_code == 400 and "response_format" in body:
+                body.pop("response_format")
+                r = await http.post(URL, json=body, headers=headers)
+            r.raise_for_status()
+            content = r.json()["choices"][0]["message"]["content"]
+            return parse_pronunciation_response(content)
+        except Exception as e:
+            log.warning("generate_pronunciation failed: %s", e)
+            raise TranslationError(f"Pronunciation generation failed: {e}") from e
+        finally:
+            if own:
+                await http.aclose()
 
     async def translate_word(self, *, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None, lang: str = "ru") -> str:
         """Перевод одного слова в контексте."""

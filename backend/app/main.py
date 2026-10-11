@@ -145,6 +145,19 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
         )
         return {"original": word, "translation": translated}
 
+    @app.post("/api/pronunciation")
+    async def get_pronunciation(response: Response, payload: dict):
+        response.headers["Cache-Control"] = "no-store"
+        word = str(payload.get("word", "")).strip()
+        sentence = str(payload.get("sentence", "")).strip()
+        lang = str(payload.get("lang") or "es").strip()
+        if not word:
+            raise HTTPException(400, "word обязателен")
+        res = await tr.generate_pronunciation(word=word, sentence=sentence, lang=lang)
+        if not res:
+            return {"word": word, "ipa": "", "ru_hint": ""}
+        return {"word": word, "ipa": res.get("ipa", ""), "ru_hint": res.get("ru_hint", "")}
+
     if s.frontend_dist.exists():
         index_file = s.frontend_dist / "index.html"
         dist_resolved = s.frontend_dist.resolve()

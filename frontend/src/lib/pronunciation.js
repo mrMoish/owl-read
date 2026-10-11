@@ -2,6 +2,7 @@
  * Utility for word pronunciation audio playback and generating
  * phonetic transcription (IPA) and Russian pronunciation hints.
  */
+import { fetchPronunciation } from "../api.js";
 
 export function speakWord(text, lang = "es") {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -184,9 +185,7 @@ function getSpanishPronunciation(word) {
   }
 
   // Syllabification & phonetics step
-  // Standard Spanish vowel categories
   const vowels = new Set(["a", "e", "i", "o", "u", "á", "é", "í", "ó", "ú", "ü"]);
-  const strongVowels = new Set(["a", "e", "o", "á", "é", "ó"]);
 
   // Collect vowel positions
   const vowelIndices = [];
@@ -300,9 +299,7 @@ function getSpanishPronunciation(word) {
       pieceRu = c;
     }
 
-    // Attach combining acute accent if this vowel is stressed
     if (i === stressedVowelIdx && pieceRu.length > 0) {
-      // Put accent mark after the first vowel character in pieceRu
       pieceRu = pieceRu[0] + "\u0301" + pieceRu.slice(1);
     }
 
@@ -310,10 +307,8 @@ function getSpanishPronunciation(word) {
     i += consumed;
   }
 
-  // Adjust double soft signs or formatting if needed
   ru = ru.replace(/нь([еияюэóаоуе́а́э́и́о́у́])/g, "н$1");
 
-  // Build IPA
   let ipaChars = [];
   let curr = 0;
   while (curr < charArray.length) {
@@ -368,11 +363,8 @@ function getSpanishPronunciation(word) {
     }
   }
 
-  // Insert stress symbol in IPA
   if (stressedVowelIdx >= 0) {
-    // Insert ˈ before the syllable containing stressedVowelIdx
     let ipaStr = ipaChars.join("");
-    // Simplifed IPA formatting
     if (ipaStr.length > 2) {
       const mid = Math.max(0, Math.floor(ipaStr.length / 2) - 1);
       ipaStr = ipaStr.slice(0, mid) + "." + ipaStr.slice(mid);
@@ -390,11 +382,9 @@ function getEnglishPronunciation(word) {
     return EN_DICT[clean];
   }
 
-  // Rule-based fallback for English
   let ipa = clean;
   let ru = clean;
 
-  // Common suffix / letter transformations
   ru = ru
     .replace(/tion/g, "шн")
     .replace(/sion/g, "жн")
@@ -447,7 +437,6 @@ function getEnglishPronunciation(word) {
 
 function getRussianPronunciation(word) {
   const clean = word.trim();
-  // Add stress mark if not present
   const vowels = /[аеёиоуыэюя]/i;
   const matchVowels = clean.match(new RegExp(vowels, "gi")) || [];
   let ruHint = clean;
@@ -458,14 +447,12 @@ function getRussianPronunciation(word) {
       ruHint = clean.slice(0, idx + 1) + "\u0301" + clean.slice(idx + 1);
     }
   } else if (!clean.includes("\u0301") && !clean.includes("ё") && matchVowels.length > 1) {
-    // Put stress mark on first vowel if multi-vowel word
     const idx = clean.search(vowels);
     if (idx !== -1) {
       ruHint = clean.slice(0, idx + 1) + "\u0301" + clean.slice(idx + 1);
     }
   }
 
-  // IPA for Russian
   let ipa = clean.toLowerCase()
     .replace(/ч/g, "tʃ")
     .replace(/ш/g, "ʂ")
@@ -511,4 +498,20 @@ export function getPronunciation(rawWord, lang = "es") {
   } else {
     return getRussianPronunciation(cleanWord);
   }
+}
+
+export async function fetchAiPronunciation({ word, sentence = "", lang = "es" }) {
+  const fallback = getPronunciation(word, lang);
+  try {
+    const res = await fetchPronunciation({ word, sentence, lang });
+    if (res && (res.ipa || res.ru_hint)) {
+      return {
+        ipa: res.ipa || fallback.ipa,
+        ruHint: res.ru_hint || fallback.ruHint,
+      };
+    }
+  } catch (e) {
+    // API unavailable or offline
+  }
+  return fallback;
 }

@@ -1,11 +1,24 @@
-import React, { useEffect } from "react";
-import { getPronunciation, speakWord } from "../lib/pronunciation.js";
+import React, { useEffect, useState } from "react";
+import { fetchAiPronunciation, getPronunciation, speakWord } from "../lib/pronunciation.js";
 
 export default function PronunciationModal({ data, onClose }) {
   if (!data || !data.word) return null;
 
-  const { word, lang = "es" } = data;
-  const { ipa, ruHint } = getPronunciation(word, lang);
+  const { word, sentence = "", lang = "es" } = data;
+  const [pronData, setPronData] = useState(() => getPronunciation(word, lang));
+
+  // Fetch AI pronunciation on mount and update state
+  useEffect(() => {
+    let cancelled = false;
+    fetchAiPronunciation({ word, sentence, lang }).then((res) => {
+      if (!cancelled && res) {
+        setPronData(res);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [word, sentence, lang]);
 
   // Auto-play pronunciation once when modal opens
   useEffect(() => {
@@ -28,6 +41,8 @@ export default function PronunciationModal({ data, onClose }) {
     speakWord(word, lang);
   };
 
+  const { ipa, ruHint } = pronData;
+
   return (
     <div className="pronunciation-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div className="pronunciation-modal" onClick={(e) => e.stopPropagation()}>
@@ -38,17 +53,15 @@ export default function PronunciationModal({ data, onClose }) {
           aria-label="Воспроизвести произношение"
           title="Воспроизвести"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
             <polygon points="6,4 20,12 6,20" />
           </svg>
         </button>
 
         <div className="pronunciation-info">
-          <div className="pronunciation-word-line">
-            <span className="pronunciation-word">{word}</span>
-            {ipa && <span className="pronunciation-ipa">{ipa}</span>}
-          </div>
-          {ruHint && <div className="pronunciation-ru-hint">{ruHint}</div>}
+          <div className="pronunciation-line-word">{word}</div>
+          <div className="pronunciation-line-ipa">{ipa}</div>
+          <div className="pronunciation-line-hint">{ruHint}</div>
         </div>
 
         <button
