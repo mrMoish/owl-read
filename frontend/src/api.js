@@ -6,6 +6,11 @@ async function j(path, opts) {
   return r.json();
 }
 
+export const syncBrochure = (langMode = "ru") => {
+  const langParam = typeof langMode === "boolean" ? (langMode ? "en" : "ru") : langMode;
+  return j(`/api/brochures/sync?lang=${langParam}`);
+};
+
 export const fetchDaily = (date, langMode = "ru") => {
   const langParam = typeof langMode === "boolean" ? (langMode ? "en" : "ru") : langMode;
   const query = langParam === "en" ? `date=${date}&en=1` : (langParam === "es" ? `date=${date}&lang=es` : `date=${date}&lang=ru`);

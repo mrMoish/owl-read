@@ -22,7 +22,7 @@ def get_settings() -> Settings:
     return Settings(
         db_path=db_dir / "reader.db",
         openrouter_api_key=os.environ.get("OPENROUTER_API_KEY", "").strip(),
-        openrouter_model=os.environ.get("OPENROUTER_MODEL", "x-ai/grok-voice-tts-1.0").strip(),
+        openrouter_model=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini").strip(),
         translate_max_share=float(os.environ.get("TRANSLATE_MAX_SHARE", "0.5")),
         timezone=os.environ.get("APP_TIMEZONE", "Europe/Moscow"),
         frontend_dist=frontend_dist,

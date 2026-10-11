@@ -1,4 +1,4 @@
-import asyncio, json
+import asyncio, json, logging
 from dataclasses import replace
 from datetime import date, datetime, timezone, timedelta
 import httpx
@@ -197,3 +197,37 @@ def test_pronunciation_endpoint(tmp_path):
         assert res.json() == {"word": "esposos", "ipa": "[esˈposos]", "ru_hint": "эспо́сос"}
     finally:
         o.OpenRouterClient.__init__ = orig
+
+
+def test_server_logging_output(tmp_path, caplog):
+    """Проверяет запись сервером логов при запросах к API без разглашения чувствительных данных."""
+    caplog.set_level(logging.INFO)
+    app = make_app(tmp_path)
+    c = TestClient(app)
+
+    r = c.get("/api/daily?date=2026-10-06&lang=es")
+    assert r.status_code == 200
+
+    logs = caplog.text
+    assert "[API Daily] GET /api/daily: date=2026-10-06 lang=es" in logs
+    assert "[DailyService Get] Requested daily content: date=2026-10-06 lang=es" in logs
+    assert "[API Daily Success] GET /api/daily completed" in logs
+
+
+def test_server_logging_failure_scenario(tmp_path, caplog):
+    """Проверяет логирование ошибок с сохранением уровня WARNING/ERROR при сбоях EPUB."""
+    caplog.set_level(logging.INFO)
+
+    class FailingEpubManager(EpubBrochureManager):
+        async def fetch_brochure_epub(self, year: int, lang: str = "ru", client=None):
+            raise EpubError(f"HTTP 500 Test Error for year {year}")
+
+    app = make_app(tmp_path, epub_mgr=FailingEpubManager(storage_dir=tmp_path))
+    c = TestClient(app)
+
+    r = c.get("/api/daily?date=2026-10-06&lang=es")
+    assert r.status_code == 503
+
+    logs = caplog.text
+    assert "[DailyService EpubError]" in logs
+    assert "HTTP 500 Test Error" in logs

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchDaily, requestTranslations } from "./api.js";
+import { fetchDaily, requestTranslations, syncBrochure } from "./api.js";
 import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
 import { initialData, offlineState } from "./lib/offline.js";
 import { isEnglishPath, isSpanishPath, isRussianPath } from "./lib/language.js";
@@ -28,15 +28,6 @@ function activeDate() {
   return localDate();
 }
 
-/** Автоматическая синка брошюры при прямом переходе по ссылке /es или /ru */
-async function syncBrochure(lang) {
-  try {
-    await fetch(`/api/brochures/sync?lang=${lang}`);
-  } catch {
-    // Ошибка синхронизации брошюры не ломает интерфейс
-  }
-}
-
 /** При каждом запуске грузит материал дня и заранее подготавливает переводы. */
 export function useDaily() {
   const langMode = activeLangMode();
@@ -55,8 +46,8 @@ export function useDaily() {
     const langKey = langMode;
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    // Автоматическая подгрузка/проверка брошюры для выбранного языка
-    syncBrochure(langMode);
+    // Автоматическая подгрузка/проверка брошюры для выбранного языка через API
+    syncBrochure(langMode).catch(() => {});
 
     try {
       let data = await fetchDaily(date, langMode);

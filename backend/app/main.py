@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from fastapi import FastAPI, HTTPException, Query, Response
@@ -54,12 +55,21 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
 
     @app.get("/api/brochures/sync")
     async def sync_brochure(lang: str = Query("ru")):
+        start_time = time.monotonic()
         active_lang = _resolve_lang(lang, None)
         current_year = datetime.now(ZoneInfo(s.timezone)).year
+        log.info("[API Sync] Brochure sync requested: input_lang=%s resolved_lang=%s year=%d",
+                 lang, active_lang, current_year)
         try:
             path = await epub_mgr.fetch_brochure_epub(current_year, lang=active_lang)
+            elapsed = time.monotonic() - start_time
+            log.info("[API Sync Success] Brochure synced: year=%d lang=%s file=%s duration=%.3fs",
+                     current_year, active_lang, path.name, elapsed)
             return {"ok": True, "year": current_year, "lang": active_lang, "file": path.name}
         except Exception as e:
+            elapsed = time.monotonic() - start_time
+            log.exception("[API Sync Exception] Brochure sync failed: lang=%s year=%d error=%s duration=%.3fs",
+                          active_lang, current_year, e, elapsed)
             raise HTTPException(500, f"Не удалось скачать брошюру: {e}")
 
     @app.get("/api/daily")
@@ -67,8 +77,12 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
                         date: str | None = Query(None, pattern=r"^\d{4}-\d{1,2}-\d{1,2}$"),
                         lang: str | None = Query(None),
                         en: str | None = Query(None)):
+        start_time = time.monotonic()
         response.headers["Cache-Control"] = "no-store"
         active_lang = _resolve_lang(lang, en)
+        log.info("[API Daily] GET /api/daily: date=%s lang=%s en=%s resolved_lang=%s",
+                 date, lang, en, active_lang)
+
         try:
             if active_lang == "en":
                 content, notice = await daily.get_english(date)
@@ -77,17 +91,34 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
             else:
                 content, notice = await daily.get(date)
         except EpubError as e:
+            elapsed = time.monotonic() - start_time
+            log.warning("[API Daily EpubError] Material unavailable: date=%s lang=%s error=%s duration=%.3fs",
+                        date, active_lang, e, elapsed)
             raise HTTPException(503, f"Материал недоступен: {e}")
+        except Exception as e:
+            elapsed = time.monotonic() - start_time
+            log.exception("[API Daily Exception] Unexpected exception: date=%s lang=%s error=%s duration=%.3fs",
+                          date, active_lang, e, elapsed)
+            raise HTTPException(500, f"Внутренняя ошибка сервера: {e}")
+
         translations, status = tr.cached(content, lang=active_lang)
-        return daily.public(content, translations, status, notice)
+        res = daily.public(content, translations, status, notice)
+        elapsed = time.monotonic() - start_time
+        log.info("[API Daily Success] GET /api/daily completed: date=%s lang=%s translations_status=%s notice=%s duration=%.3fs",
+                 res.get("date"), active_lang, status, notice, elapsed)
+        return res
 
     @app.post("/api/daily/translations")
     async def make_translations(response: Response,
                                 date: str | None = Query(None, pattern=r"^\d{4}-\d{1,2}-\d{1,2}$"),
                                 lang: str | None = Query(None),
                                 en: str | None = Query(None)):
+        start_time = time.monotonic()
         response.headers["Cache-Control"] = "no-store"
         active_lang = _resolve_lang(lang, en)
+        log.info("[API Daily Translations] POST /api/daily/translations: date=%s lang=%s en=%s resolved_lang=%s",
+                 date, lang, en, active_lang)
+
         try:
             if active_lang == "en":
                 content, notice = await daily.get_english(date)
@@ -96,7 +127,11 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
             else:
                 content, notice = await daily.get(date)
         except EpubError as e:
+            elapsed = time.monotonic() - start_time
+            log.warning("[API Daily Translations EpubError] Material unavailable: date=%s lang=%s error=%s duration=%.3fs",
+                        date, active_lang, e, elapsed)
             raise HTTPException(503, f"Материал недоступен: {e}")
+
         ref_text = ""
         try:
             if active_lang in ("en", "es"):
@@ -104,9 +139,14 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
             else:
                 ref_content, _ = await daily.get_spanish(date or None)
             ref_text = _flatten_daily_text(ref_content)
-        except EpubError:
+        except EpubError as e:
+            log.info("[API Daily Translations] Reference text not available for lang=%s: %s", active_lang, e)
             ref_text = ""
+
         translations, status = await tr.ensure(content, spanish_reference=ref_text, lang=active_lang)
+        elapsed = time.monotonic() - start_time
+        log.info("[API Daily Translations Success] Completed: date=%s lang=%s translations_count=%d status=%s duration=%.3fs",
+                 content["date"], active_lang, len(translations), status, elapsed)
         return {"date": content["date"], "translations": {str(k): v for k, v in translations.items()},
                 "translations_status": status}
 
@@ -119,6 +159,10 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
         context = str(payload.get("context", sentence)).strip()
         date = str(payload.get("date") or "").strip()
         lang = str(payload.get("lang") or "").strip()
+
+        log.info("[API Translate] POST /api/translate: word='%s' lemma='%s' date=%s lang=%s",
+                 word, lemma, date, lang)
+
         if not word or not sentence:
             raise HTTPException(400, "word и sentence обязательны")
         if lang == "en" or payload.get("en") is not None:
@@ -127,6 +171,7 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
             active_lang = "es"
         else:
             active_lang = "ru"
+
         try:
             if active_lang == "en":
                 content, _ = await daily.get_english(date or None)
@@ -136,6 +181,7 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
                 content, _ = await daily.get(date or None)
         except EpubError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
+
         ref_text = ""
         try:
             if active_lang in ("en", "es"):
@@ -145,6 +191,7 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
             ref_text = _flatten_daily_text(ref_content)
         except EpubError:
             ref_text = ""
+
         translated = await tr.translate_word(
             date=date or content["date"],
             word=word,
