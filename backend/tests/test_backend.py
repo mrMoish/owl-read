@@ -353,8 +353,37 @@ def test_tts_endpoint(tmp_path):
         data = res.json()
         assert captured["url"] == "https://openrouter.ai/api/v1/audio/speech"
         assert captured["body"]["model"] == "x-ai/grok-voice-tts-1.0"
+        assert captured["body"]["voice"] == "eve"
         assert captured["body"]["input"] == "esposos"
         assert data["audio_b64"] == base64.b64encode(b"dummy audio binary").decode("ascii")
         assert data["format"] == "mp3"
     finally:
         o.OpenRouterClient.__init__ = orig
+
+
+def test_tts_endpoint_404_handling(tmp_path, caplog):
+    import logging
+    def handler(request):
+        return httpx.Response(
+            404,
+            json={"error": {"message": "Provider returned 404", "code": 404}},
+            headers={"Content-Type": "application/json"}
+        )
+
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = o.OpenRouterClient(api_key="secret-key-12345", model="test-model", http=http)
+
+    with caplog.at_level(logging.WARNING):
+        try:
+            asyncio.run(client.generate_tts(word="test"))
+            assert False, "Expected TranslationError on 404 response"
+        except o.TranslationError as e:
+            assert "TTS generation failed" in str(e)
+
+    # Confirm safe logging: model, voice, status code logged, secret API key NOT in logs
+    logs = caplog.text
+    assert "x-ai/grok-voice-tts-1.0" in logs
+    assert "eve" in logs
+    assert "404" in logs
+    assert "secret-key-12345" not in logs

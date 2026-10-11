@@ -145,7 +145,7 @@ class OpenRouterClient:
         body = {
             "model": "x-ai/grok-voice-tts-1.0",
             "input": word,
-            "voice": "alloy",
+            "voice": "eve",
             "response_format": "mp3",
         }
         headers = {"Authorization": f"Bearer {self.api_key}", "X-Title": "Daily Reader"}
@@ -154,8 +154,14 @@ class OpenRouterClient:
         try:
             r = await http.post(TTS_URL, json=body, headers=headers)
             if not r.is_success:
-                err_text = r.text[:300].replace("\n", " ")
-                log.warning("OpenRouter TTS endpoint HTTP %s: %s", r.status_code, err_text)
+                err_text = r.text[:500].replace("\n", " ")
+                log.warning(
+                    "OpenRouter TTS failure (model=%s, voice=%s, status=%s): %s",
+                    body["model"],
+                    body["voice"],
+                    r.status_code,
+                    err_text,
+                )
             r.raise_for_status()
             audio_bytes = r.content
             if not audio_bytes:
