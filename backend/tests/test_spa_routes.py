@@ -20,9 +20,6 @@ def test_spa_route_serving():
             openrouter_model=base.openrouter_model,
             db_path=pathlib.Path(tmpdir) / "test.db",
             timezone=base.timezone,
-            wol_base_url=base.wol_base_url,
-            es_wol_base_url=base.es_wol_base_url,
-            en_wol_base_url=base.en_wol_base_url,
             translate_max_share=base.translate_max_share,
             frontend_dist=dist,
         )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -9,7 +11,7 @@ from .daily import DailyService
 from .store import Store
 from .translation.openrouter import OpenRouterClient
 from .translation.service import TranslationService
-from .wol.fetcher import WolError, fetch_wol_page
+from .epub import EpubBrochureManager, EpubError
 
 log = logging.getLogger("reader")
 
@@ -22,16 +24,15 @@ def _resolve_lang(lang_param: str | None, en_param: str | None) -> str:
     return "ru"
 
 
-def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None, fetch_english=None) -> FastAPI:
+def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManager | None = None) -> FastAPI:
     s = settings or get_settings()
     store = Store(s.db_path)
     client = OpenRouterClient(s.openrouter_api_key, s.openrouter_model) if s.openrouter_api_key else None
     if not client:
         log.warning("OPENROUTER_API_KEY не задан: перевод отключён, текст останется на русском")
     tr = TranslationService(store, client, s.translate_max_share)
-    daily = DailyService(s, store, tr, fetch=fetch or fetch_wol_page,
-                         fetch_spanish=fetch_spanish or (lambda base, day, client=None: fetch_wol_page(base, day, client=client, language="es")),
-                         fetch_english=fetch_english or (lambda base, day, client=None: fetch_wol_page(base, day, client=client, language="en")))
+    epub_mgr = epub_manager or EpubBrochureManager()
+    daily = DailyService(s, store, tr, epub_manager=epub_mgr)
     app = FastAPI(title="Daily Reader")
     origins = [
         o.strip().rstrip("/")
@@ -51,6 +52,16 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
     def health():
         return {"ok": True, "translation": bool(client)}
 
+    @app.get("/api/brochures/sync")
+    async def sync_brochure(lang: str = Query("ru")):
+        active_lang = _resolve_lang(lang, None)
+        current_year = datetime.now(ZoneInfo(s.timezone)).year
+        try:
+            path = await epub_mgr.fetch_brochure_epub(current_year, lang=active_lang)
+            return {"ok": True, "year": current_year, "lang": active_lang, "file": path.name}
+        except Exception as e:
+            raise HTTPException(500, f"Не удалось скачать брошюру: {e}")
+
     @app.get("/api/daily")
     async def get_daily(response: Response,
                         date: str | None = Query(None, pattern=r"^\d{4}-\d{1,2}-\d{1,2}$"),
@@ -65,7 +76,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
                 content, notice = await daily.get_spanish(date)
             else:
                 content, notice = await daily.get(date)
-        except WolError as e:
+        except EpubError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
         translations, status = tr.cached(content, lang=active_lang)
         return daily.public(content, translations, status, notice)
@@ -84,7 +95,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
                 content, notice = await daily.get_spanish(date)
             else:
                 content, notice = await daily.get(date)
-        except WolError as e:
+        except EpubError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
         ref_text = ""
         try:
@@ -93,7 +104,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
             else:
                 ref_content, _ = await daily.get_spanish(date or None)
             ref_text = _flatten_daily_text(ref_content)
-        except WolError:
+        except EpubError:
             ref_text = ""
         translations, status = await tr.ensure(content, spanish_reference=ref_text, lang=active_lang)
         return {"date": content["date"], "translations": {str(k): v for k, v in translations.items()},
@@ -123,7 +134,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
                 content, _ = await daily.get_spanish(date or None)
             else:
                 content, _ = await daily.get(date or None)
-        except WolError as e:
+        except EpubError as e:
             raise HTTPException(503, f"Материал недоступен: {e}")
         ref_text = ""
         try:
@@ -132,7 +143,7 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
             else:
                 ref_content, _ = await daily.get_spanish(date or None)
             ref_text = _flatten_daily_text(ref_content)
-        except WolError:
+        except EpubError:
             ref_text = ""
         translated = await tr.translate_word(
             date=date or content["date"],

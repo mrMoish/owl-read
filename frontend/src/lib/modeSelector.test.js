@@ -3,17 +3,17 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-test("ModeSelector component renders all three mode paths", () => {
+test("ModeSelector component renders language selector and target routes", () => {
   const fileContent = fs.readFileSync(
     path.resolve(process.cwd(), "src/components/ModeSelector.jsx"),
     "utf8"
   );
 
-  assert.match(fileContent, /path:\s*["']\/ru\/["']/);
-  assert.match(fileContent, /path:\s*["']\/es\/["']/);
-  assert.match(fileContent, /path:\s*["']\/en\/["']/);
+  assert.match(fileContent, /\/ru\//);
+  assert.match(fileContent, /\/es\//);
+  assert.match(fileContent, /\/en\//);
 
-  assert.match(fileContent, /es\s*→\s*ru/);
-  assert.match(fileContent, /ru\s*→\s*es/);
-  assert.match(fileContent, /en\s*→\s*ru/);
+  assert.match(fileContent, /Ваш родной язык/);
+  assert.match(fileContent, /Аргентинское произношение/);
+  assert.match(fileContent, /Не знаю алфавит/);
 });

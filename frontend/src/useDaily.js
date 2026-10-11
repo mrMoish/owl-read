@@ -28,6 +28,15 @@ function activeDate() {
   return localDate();
 }
 
+/** Автоматическая синка брошюры при прямом переходе по ссылке /es или /ru */
+async function syncBrochure(lang) {
+  try {
+    await fetch(`/api/brochures/sync?lang=${lang}`);
+  } catch {
+    // Ошибка синхронизации брошюры не ломает интерфейс
+  }
+}
+
 /** При каждом запуске грузит материал дня и заранее подготавливает переводы. */
 export function useDaily() {
   const langMode = activeLangMode();
@@ -45,6 +54,10 @@ export function useDaily() {
     const date = activeDate();
     const langKey = langMode;
     setState((s) => ({ ...s, loading: true, error: null }));
+
+    // Автоматическая подгрузка/проверка брошюры для выбранного языка
+    syncBrochure(langMode);
+
     try {
       let data = await fetchDaily(date, langMode);
       saveDaily(data, langKey);

@@ -4,6 +4,7 @@ import {
   loadLearnedWords,
   addLearnedWord,
   removeLearnedWord,
+  loadUserSettings,
 } from "./lib/storage.js";
 import {
   normalizeLemma,
@@ -14,8 +15,9 @@ import Comment from "./components/Comment.jsx";
 import PronunciationModal from "./components/PronunciationModal.jsx";
 import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
+import { transliterateBlock } from "./lib/transliteration.js";
 
-const BUILD_ID = "2026.10.10.v5";
+const BUILD_ID = "2026.10.10.v6";
 
 function flattenText(nodes) {
   return nodes.map((n) => {
@@ -38,6 +40,7 @@ export default function App() {
 
   const [isDebug, setIsDebug] = useState(false);
   const [swControlled, setSwControlled] = useState(false);
+  const [userSettings, setUserSettings] = useState(() => loadUserSettings());
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -60,12 +63,22 @@ export default function App() {
   const sourceLang = currentLang;
   const targetLang = currentLang === "en" ? "ru" : (currentLang === "es" ? "ru" : "es");
 
-  const isStandalone = typeof window !== "undefined" && (
-    window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true
-  );
+  // Транслитерация если включена опция noAlphabet
+  const displayVerse = useMemo(() => {
+    if (!data?.verse) return null;
+    if (userSettings?.noAlphabet) {
+      return transliterateBlock(data.verse, sourceLang, targetLang);
+    }
+    return data.verse;
+  }, [data?.verse, userSettings?.noAlphabet, sourceLang, targetLang]);
 
-  const rawStoredLang = typeof window !== "undefined" ? localStorage.getItem("reader.lang") : null;
-  const lastApiUrl = data?.date ? `/api/daily?date=${data.date}${isEn ? "&en=1" : ""}` : "N/A";
+  const displayComment = useMemo(() => {
+    if (!data?.comment) return [];
+    if (userSettings?.noAlphabet) {
+      return data.comment.map((b) => transliterateBlock(b, sourceLang, targetLang));
+    }
+    return data.comment;
+  }, [data?.comment, userSettings?.noAlphabet, sourceLang, targetLang]);
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
     if (!data?.date || !sentence) {
@@ -76,13 +89,11 @@ export default function App() {
     const isCurrentlyTranslated = Boolean(visibleTranslations[key]);
 
     if (isCurrentlyTranslated) {
-      // Пользователь нажал на переведённое слово -> сброс слова и его словоформ
       const nextLearned = removeLearnedWord(normLemma);
       setLearnedWords(nextLearned || {});
       return;
     }
 
-    // 1. Получаем перевод для нажатого слова (подготовленный или fallback)
     let translated = data?.translations?.[key];
     if (!translated || translated === word) {
       try {
@@ -97,7 +108,7 @@ export default function App() {
         const res = await translateWord(payload);
         translated = res?.translation || res?.original || word;
       } catch {
-        // Ошибка перевода не ломает UX.
+        // Fallback
       }
     }
 
@@ -105,8 +116,6 @@ export default function App() {
       return;
     }
 
-    // 2. Сохраняем выбор пользователя в постоянном глобальном хранилище.
-    // Применение к текущему и последующим текстам произойдет через applyLearnedTranslations.
     const nextLearned = addLearnedWord(normLemma, translated);
     setLearnedWords(nextLearned || {});
   };
@@ -134,31 +143,27 @@ export default function App() {
             <h3>[Diagnostic Panel]</h3>
             <div><strong>Build ID:</strong> {BUILD_ID}</div>
             <div><strong>SW Controlled:</strong> {swControlled ? "Yes (active)" : "No"}</div>
-            <div><strong>location.href:</strong> {typeof window !== "undefined" ? window.location.href : ""}</div>
-            <div><strong>Standalone mode:</strong> {isStandalone ? "True (PWA)" : "False (Browser)"}</div>
             <div><strong>Effective Lang:</strong> {currentLang}</div>
-            <div><strong>Lang Source:</strong> {langSource}</div>
-            <div><strong>Raw Stored reader.lang:</strong> {rawStoredLang || "null"}</div>
-            <div><strong>Last /api/daily Request:</strong> {lastApiUrl}</div>
-            <div><strong>Response Date / Label:</strong> {data ? `${data.date} (${data.date_label})` : "loading..."}</div>
           </section>
         )}
         {notice && <p className="notice" role="status">{notice}</p>}
         {data ? (
           <article>
             <h1>{data.date_label}</h1>
-            <Scripture
-              block={data.verse}
-              translations={visibleTranslations}
-              onWordClick={handleWordClick}
-              onWordLongPress={handleWordLongPress}
-              meta={data.meta || {}}
-              sourceLang={sourceLang}
-              targetLang={targetLang}
-              lang={targetLang}
-            />
+            {displayVerse && (
+              <Scripture
+                block={displayVerse}
+                translations={visibleTranslations}
+                onWordClick={handleWordClick}
+                onWordLongPress={handleWordLongPress}
+                meta={data.meta || {}}
+                sourceLang={sourceLang}
+                targetLang={targetLang}
+                lang={targetLang}
+              />
+            )}
             <Comment
-              blocks={data.comment}
+              blocks={displayComment}
               translations={visibleTranslations}
               onWordClick={handleWordClick}
               onWordLongPress={handleWordLongPress}
