@@ -19,7 +19,7 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 .verse p, .comment p { margin: 0; }
 .comment p + p { margin-top: 1.1em; }
 .verse p, .comment p {
-  font-size: clamp(1.05rem, 0.98rem + 0.4vw, 1.2rem); line-height: 1.7;
+  font-size: clamp(1.05rem, 0.98rem + 0.4vw, 1.2rem); line-height: 2.1;
   text-align: justify; hyphens: auto; -webkit-hyphens: auto; overflow-wrap: break-word; text-wrap: pretty;
 }
 .page a { color: inherit; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
