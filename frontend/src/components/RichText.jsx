@@ -1,8 +1,7 @@
-import React, { useLayoutEffect, useRef } from "react";
-import { reorderNodes } from "../lib/swap.js";
+import React from "react";
 import { formatTextNode } from "../lib/punct.js";
 
-function Node({ node, index, translations, onWordClick, meta, registerRef, lang }) {
+function Node({ node, index, translations, onWordClick, meta, lang }) {
   if (!node) return null;
   if (node.t === "text") return formatTextNode(node.s);
   if (node.t === "w") {
@@ -15,7 +14,6 @@ function Node({ node, index, translations, onWordClick, meta, registerRef, lang 
     return (
       <span
         key={id}
-        ref={(el) => registerRef && registerRef(id, el)}
         lang={wordLang}
         className={`word ${translated ? "word--translated" : ""}`}
         onClick={() => onWordClick({
@@ -54,7 +52,6 @@ function Node({ node, index, translations, onWordClick, meta, registerRef, lang 
       translations={translations}
       onWordClick={onWordClick}
       meta={meta}
-      registerRef={registerRef}
       lang={lang}
     />
   )) : null;
@@ -66,62 +63,7 @@ function Node({ node, index, translations, onWordClick, meta, registerRef, lang 
 }
 
 export default function RichText({ nodes = [], translations = {}, onWordClick = () => {}, meta = {}, lang = "es" }) {
-  const wordRefs = useRef({});
-  const prevRects = useRef({});
-
-  const registerRef = (id, el) => {
-    if (el) {
-      wordRefs.current[id] = el;
-    } else {
-      delete wordRefs.current[id];
-    }
-  };
-
-  const reordered = reorderNodes(nodes, translations, meta, lang);
-
-  useLayoutEffect(() => {
-    const currentRects = {};
-    for (const [id, el] of Object.entries(wordRefs.current)) {
-      if (el) {
-        currentRects[id] = el.getBoundingClientRect();
-      }
-    }
-
-    // FLIP Animation
-    for (const [id, el] of Object.entries(wordRefs.current)) {
-      if (!el) continue;
-      const prev = prevRects.current[id];
-      const current = currentRects[id];
-
-      if (prev && current) {
-        const deltaX = prev.left - current.left;
-        const deltaY = prev.top - current.top;
-
-        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
-          // Invert
-          el.style.transition = "none";
-          el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-          el.classList.add("word--swapping");
-
-          // Play
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              el.style.transition = "transform 0.4s cubic-bezier(0.2, 0, 0.2, 1)";
-              el.style.transform = "";
-              setTimeout(() => {
-                el.classList.remove("word--swapping");
-                el.style.transition = "";
-              }, 400);
-            });
-          });
-        }
-      }
-    }
-
-    prevRects.current = currentRects;
-  });
-
-  return reordered.map((node, index) => (
+  return nodes.map((node, index) => (
     <Node
       key={node.t === "w" ? String(node.id) : `${index}-${node.t}`}
       node={node}
@@ -129,7 +71,6 @@ export default function RichText({ nodes = [], translations = {}, onWordClick = 
       translations={translations}
       onWordClick={onWordClick}
       meta={meta}
-      registerRef={registerRef}
       lang={lang}
     />
   ));
