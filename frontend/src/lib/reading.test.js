@@ -263,6 +263,23 @@ test("10. Корректная замена, когда перевод сост�
   assert.equal(visible["0"], "por la mañana");
 });
 
+test("11. normalizeLemma поддерживает фразы из нескольких слов и испанские спецсимволы", () => {
+  assert.equal(normalizeLemma("ni siquiera"), "ni siquiera");
+  assert.equal(normalizeLemma("  Ni   siquiera! "), "ni siquiera");
+  assert.equal(normalizeLemma("«desconsiderada»"), "desconsiderada");
+  assert.equal(normalizeLemma("¡maltraten!"), "maltraten");
+
+  const meta = { "0": { w: "ni siquiera", lemma: "ni siquiera" } };
+  const learned = {
+    "ni siquiera": { lemma: "ni siquiera", primaryTranslation: "даже не", translations: ["даже не"] },
+  };
+  const visible = applyLearnedTranslations({
+    meta,
+    learnedWords: learned,
+  });
+  assert.equal(visible["0"], "даже не");
+});
+
 test("formatTextNode converts space before dash to non-breaking space and glues punctuation", () => {
   assert.equal(formatTextNode("христиане — они"), "христиане\u00A0— они");
   assert.equal(formatTextNode("слово , которое"), "слово, которое");

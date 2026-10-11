@@ -10,7 +10,8 @@ export function normalizeLemma(text) {
   return String(text)
     .trim()
     .toLowerCase()
-    .replace(/^[^\wа-яё]+|[^\wа-яё]+$/gi, "");
+    .replace(/\s+/g, " ")
+    .replace(/^[^\wа-яёáéíóúñü]+|[^\wа-яёáéíóúñü]+$/gi, "");
 }
 
 /**

@@ -10,10 +10,102 @@ import re
 from functools import lru_cache
 import pymorphy3
 
-WORD_RE = re.compile(r"[А-Яа-яЁё]+(?:-[А-Яа-яЁё]+)*")
-EN_WORD_RE = re.compile(r"[A-Za-z]+(?:-[A-Za-z]+)*")
-ES_WORD_RE = re.compile(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+(?:-[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+)*")
 SENT_RE = re.compile(r"(?<=[.!?…])[»\"\)]*\s+(?=[«\"—А-ЯЁA-ZÁÉÍÓÚÑÜ])")
+
+ES_PHRASES = [
+    "a causa de",
+    "a fin de",
+    "a menos que",
+    "a pesar de",
+    "a través de",
+    "al menos",
+    "antes de",
+    "así que",
+    "cerca de",
+    "dado que",
+    "de hecho",
+    "debido a",
+    "después de",
+    "en cuanto a",
+    "en lugar de",
+    "en medio de",
+    "en vez de",
+    "gracias a",
+    "hoy en día",
+    "junto a",
+    "lejos de",
+    "más bien",
+    "ni siquiera",
+    "para que",
+    "por ejemplo",
+    "por favor",
+    "por fin",
+    "por lo tanto",
+    "por supuesto",
+    "sin duda",
+    "sin embargo",
+    "tal vez",
+    "ya que",
+]
+
+EN_PHRASES = [
+    "according to",
+    "as long as",
+    "as soon as",
+    "as well as",
+    "at least",
+    "because of",
+    "due to",
+    "even if",
+    "for example",
+    "in fact",
+    "in order to",
+    "instead of",
+    "no longer",
+    "so that",
+    "such as",
+]
+
+RU_PHRASES = [
+    "без сомнения",
+    "в отличие от",
+    "в результате",
+    "в течение",
+    "в то время как",
+    "вместо того чтобы",
+    "для того чтобы",
+    "до тех пор пока",
+    "на самом деле",
+    "несмотря на",
+    "ни разу",
+    "по крайней мере",
+    "потому что",
+    "с тех пор как",
+    "так как",
+    "так что",
+    "тем не менее",
+]
+
+
+@lru_cache(maxsize=8)
+def get_word_re(lang: str = "ru") -> re.Pattern:
+    if lang == "en":
+        phrases = EN_PHRASES
+        single = r"[A-Za-z]+(?:-[A-Za-z]+)*"
+    elif lang == "es":
+        phrases = ES_PHRASES
+        single = r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+(?:-[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+)*"
+    else:
+        phrases = RU_PHRASES
+        single = r"[А-Яа-яЁё]+(?:-[А-Яа-яЁё]+)*"
+
+    sorted_phrases = sorted(phrases, key=len, reverse=True)
+    phrase_pattern = "|".join(r"\b" + r"\s+".join(map(re.escape, p.split())) + r"\b" for p in sorted_phrases)
+    if phrase_pattern:
+        pattern = f"(?:{phrase_pattern})|{single}"
+    else:
+        pattern = single
+    return re.compile(pattern, re.IGNORECASE if phrase_pattern else 0)
 
 
 @lru_cache(maxsize=1)
@@ -88,7 +180,7 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0, lang: str = "ru"):
     meta: dict[int, dict] = {}
     nid = start_id
     out_blocks = []
-    word_re = EN_WORD_RE if lang == "en" else (ES_WORD_RE if lang == "es" else WORD_RE)
+    word_re = get_word_re(lang)
     for blk in blocks:
         ctx = _Ctx(_plain(blk["nodes"]))
 
