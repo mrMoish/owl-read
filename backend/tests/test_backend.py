@@ -440,3 +440,27 @@ def test_phrase_tokenization_and_multiword_translation():
     out_caps, meta_caps, _ = analyze_blocks(es_caps_blocks, lang="es")
     words_caps = [n["s"] for n in out_caps[0]["nodes"] if n["t"] == "w"]
     assert "Ni siquiera" in words_caps
+
+
+def test_comment_blocks_word_tokenization():
+    """Проверяет, что абзацы комментария (вторая часть) корректно токенизируются в кликабельные 'w' узлы."""
+    r = parse_wol_page(PAGE, date(2026, 10, 6))
+    blocks, meta, _ = analyze_blocks([r["verse"], *r["comment"]], lang="ru")
+
+    verse_block = blocks[0]
+    comment_blocks = blocks[1:]
+
+    assert len(comment_blocks) >= 1
+
+    # Проверяем наличие 'w' узлов в блоках комментария
+    w_nodes_in_comment = [
+        n for b in comment_blocks for n in b["nodes"] if isinstance(n, dict) and n.get("t") == "w"
+    ]
+    assert len(w_nodes_in_comment) > 0, "Comment blocks must contain interactive 'w' word nodes"
+
+    # Проверяем, что метаданные для слов комментария существуют и содержат предложение и лемму
+    for w_node in w_nodes_in_comment:
+        node_id = w_node["id"]
+        assert node_id in meta
+        assert meta[node_id]["w"] == w_node["s"]
+        assert meta[node_id]["sent"]
