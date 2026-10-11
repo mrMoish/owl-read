@@ -8,6 +8,7 @@ export default function PronunciationModal({ data, onClose }) {
 
   const [pronData, setPronData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [audioLoading, setAudioLoading] = useState(false);
 
   // Fetch AI pronunciation on mount and update state
   useEffect(() => {
@@ -35,9 +36,19 @@ export default function PronunciationModal({ data, onClose }) {
     };
   }, [word, sentence, lang]);
 
+  const playAudio = async () => {
+    if (!word || audioLoading) return;
+    setAudioLoading(true);
+    try {
+      await speakWord(word, lang);
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
   // Auto-play pronunciation once when modal opens
   useEffect(() => {
-    speakWord(word, lang);
+    playAudio();
   }, [word, lang]);
 
   // Handle ESC key press to close modal
@@ -53,7 +64,7 @@ export default function PronunciationModal({ data, onClose }) {
 
   const handlePlay = (e) => {
     e.stopPropagation();
-    speakWord(word, lang);
+    playAudio();
   };
 
   if (!data || !data.word) return null;
@@ -67,12 +78,17 @@ export default function PronunciationModal({ data, onClose }) {
           type="button"
           className="pronunciation-play-btn"
           onClick={handlePlay}
+          disabled={audioLoading}
           aria-label="Воспроизвести произношение"
           title="Воспроизвести"
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="6,4 20,12 6,20" />
-          </svg>
+          {audioLoading ? (
+            <span className="pronunciation-play-spinner" />
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6,4 20,12 6,20" />
+            </svg>
+          )}
         </button>
 
         <div className="pronunciation-info">

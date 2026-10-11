@@ -143,7 +143,7 @@ class OpenRouterClient:
     async def generate_tts(self, *, word: str, lang: str = "es") -> dict[str, str]:
         import base64
         body = {
-            "model": "openai/gpt-audio-mini",
+            "model": "x-ai/grok-voice-tts-1.0",
             "input": word,
             "voice": "alloy",
             "response_format": "mp3",

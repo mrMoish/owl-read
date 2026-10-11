@@ -155,6 +155,15 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   margin-left: 2px;
 }
 
+.pronunciation-play-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--bg);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: pronSpin 0.7s linear infinite;
+}
+
 .pronunciation-info {
   flex: 1;
   min-width: 0;
