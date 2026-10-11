@@ -241,3 +241,115 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   from { opacity: 0; transform: scale(0.92) translateY(8px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+/* Mode Selector page styles */
+.mode-selector-page {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: calc(2rem + env(safe-area-inset-top)) 1.25rem 3rem;
+}
+
+.mode-selector-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.mode-selector-header h1 {
+  font-size: 2.2rem;
+  margin-bottom: 0.5rem;
+  color: var(--ink);
+}
+
+.mode-selector-subtitle {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.mode-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.mode-card {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  padding: 1.25rem 1.4rem;
+  text-decoration: none !important;
+  color: var(--ink) !important;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.mode-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.mode-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.mode-pair-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-family: monospace;
+  letter-spacing: 0.03em;
+}
+
+.mode-card-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.mode-card-subtitle {
+  font-size: 0.92rem;
+  color: var(--accent);
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+}
+
+.mode-card-desc {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.top-nav-link {
+  font-size: 0.88rem;
+  color: var(--accent);
+  text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 500;
+}
+
+.top-nav-link:hover {
+  text-decoration: underline !important;
+}

@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { formatTextNode } from "../lib/punct.js";
 
-function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceLang, targetLang, onWordClick, onWordLongPress }) {
+function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceLang = "ru", targetLang = "es", onWordClick, onWordLongPress }) {
   const timerRef = useRef(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const isLongPressRef = useRef(false);
