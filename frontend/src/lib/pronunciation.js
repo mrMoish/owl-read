@@ -4,28 +4,6 @@
  */
 import { fetchPronunciation, fetchTtsAudio } from "../api.js";
 
-function fallbackSpeechSynthesis(text, lang) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return;
-  }
-  try {
-    window.speechSynthesis.cancel();
-    const clean = text.trim();
-    if (!clean) return;
-    const utterance = new SpeechSynthesisUtterance(clean);
-    const langMap = {
-      es: "es-ES",
-      en: "en-US",
-      ru: "ru-RU",
-    };
-    utterance.lang = langMap[lang] || lang || "es-ES";
-    utterance.rate = 0.85;
-    window.speechSynthesis.speak(utterance);
-  } catch (e) {
-    console.error("SpeechSynthesis error:", e);
-  }
-}
-
 export async function speakWord(text, lang = "es") {
   const clean = text.trim();
   if (!clean) return;
@@ -35,12 +13,10 @@ export async function speakWord(text, lang = "es") {
       const mime = res.format === "mp3" ? "audio/mp3" : "audio/wav";
       const audio = new Audio(`data:${mime};base64,${res.audio_b64}`);
       await audio.play();
-      return;
     }
   } catch (e) {
-    // OpenRouter TTS unavailable, fallback to Web Speech API
+    console.warn("TTS audio failed:", e);
   }
-  fallbackSpeechSynthesis(clean, lang);
 }
 
 // Common English words dictionary (lower-cased)

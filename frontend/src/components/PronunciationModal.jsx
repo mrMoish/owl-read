@@ -6,21 +6,30 @@ export default function PronunciationModal({ data, onClose }) {
   const sentence = data?.sentence || "";
   const lang = data?.lang || "es";
 
-  const [pronData, setPronData] = useState(() => getPronunciation(word, lang));
-
-  useEffect(() => {
-    if (!word) return;
-    setPronData(getPronunciation(word, lang));
-  }, [word, lang]);
+  const [pronData, setPronData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Fetch AI pronunciation on mount and update state
   useEffect(() => {
+    if (!word) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
-    fetchAiPronunciation({ word, sentence, lang }).then((res) => {
-      if (!cancelled && res) {
-        setPronData(res);
-      }
-    });
+    setLoading(true);
+    fetchAiPronunciation({ word, sentence, lang })
+      .then((res) => {
+        if (!cancelled) {
+          setPronData(res || getPronunciation(word, lang));
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPronData(getPronunciation(word, lang));
+          setLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -49,7 +58,7 @@ export default function PronunciationModal({ data, onClose }) {
 
   if (!data || !data.word) return null;
 
-  const { ipa, ruHint } = pronData;
+  const { ipa = "", ruHint = "" } = pronData || {};
 
   return (
     <div className="pronunciation-backdrop" onClick={onClose} role="dialog" aria-modal="true">
@@ -67,9 +76,17 @@ export default function PronunciationModal({ data, onClose }) {
         </button>
 
         <div className="pronunciation-info">
-          <div className="pronunciation-line-word">{word}</div>
-          <div className="pronunciation-line-ipa">{ipa}</div>
-          <div className="pronunciation-line-hint">{ruHint}</div>
+          {loading ? (
+            <div className="pronunciation-loading" aria-label="Загрузка произношения">
+              <span className="pronunciation-spinner" />
+            </div>
+          ) : (
+            <>
+              <div className="pronunciation-line-word">{word}</div>
+              <div className="pronunciation-line-ipa">{ipa}</div>
+              <div className="pronunciation-line-hint">{ruHint}</div>
+            </>
+          )}
         </div>
 
         <button
