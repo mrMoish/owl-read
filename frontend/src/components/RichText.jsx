@@ -6,7 +6,8 @@ function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceL
   const startPosRef = useRef({ x: 0, y: 0 });
   const isLongPressRef = useRef(false);
 
-  const activeLang = sourceLang || (lang === "ru" ? "es" : lang);
+  const activeWord = translated ? content : word;
+  const activeLang = translated ? targetLang : sourceLang;
 
   const startPress = (clientX, clientY, targetElem) => {
     isLongPressRef.current = false;
@@ -19,7 +20,8 @@ function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceL
         const rect = targetElem ? targetElem.getBoundingClientRect() : null;
         onWordLongPress({
           id,
-          word,
+          word: activeWord,
+          originalWord: word,
           lemma: info.lemma || word,
           sentence: info.sent || "",
           lang: activeLang,

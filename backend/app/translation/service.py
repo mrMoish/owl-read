@@ -99,13 +99,13 @@ class TranslationService:
         self.store.put_translations({key: tr})
         return tr
 
-    async def generate_tts(self, *, word: str, lang: str = "es"):
+    async def generate_tts(self, *, word: str, sentence: str = "", lang: str = "es"):
         if not word:
             return None
         if not self.client:
             return None
         try:
-            return await self.client.generate_tts(word=word, lang=lang)
+            return await self.client.generate_tts(word=word, sentence=sentence, lang=lang)
         except TranslationError as e:
             log.warning("generate_tts failed: %s", e)
             return None

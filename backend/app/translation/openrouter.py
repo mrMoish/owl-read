@@ -147,7 +147,7 @@ class OpenRouterClient:
     def __init__(self, api_key: str, model: str, http: httpx.AsyncClient | None = None):
         self.api_key, self.model, self._http = api_key, model, http
 
-    async def generate_tts(self, *, word: str, lang: str = "es") -> dict[str, str]:
+    async def generate_tts(self, *, word: str, sentence: str = "", lang: str = "es") -> dict[str, str]:
         import base64
         input_text = f"«{word}»" if lang == "es" else (f'"{word}"' if lang == "en" else word)
         body = {

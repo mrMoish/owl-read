@@ -40,7 +40,7 @@ export default function PronunciationModal({ data, onClose }) {
     if (!word || audioLoading) return;
     setAudioLoading(true);
     try {
-      await speakWord(word, lang);
+      await speakWord(word, lang, sentence);
     } finally {
       setAudioLoading(false);
     }

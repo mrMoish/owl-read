@@ -110,9 +110,10 @@ export default function App() {
     setLearnedWords(nextLearned || {});
   };
 
-  const handleWordLongPress = ({ word, lang, rect }) => {
+  const handleWordLongPress = ({ word, sentence, lang, rect }) => {
     setPronunciationWordData({
       word,
+      sentence,
       lang: lang || sourceLang,
       rect,
     });
