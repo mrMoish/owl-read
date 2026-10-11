@@ -1,7 +1,111 @@
-import React from "react";
+import React, { useRef } from "react";
 import { formatTextNode } from "../lib/punct.js";
 
-function Node({ node, index, translations, onWordClick, meta, lang }) {
+function WordSpan({ id, word, info, translated, content, wordLang, lang, onWordClick, onWordLongPress }) {
+  const timerRef = useRef(null);
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const isLongPressRef = useRef(false);
+
+  const startPress = (clientX, clientY, targetElem) => {
+    isLongPressRef.current = false;
+    startPosRef.current = { x: clientX, y: clientY };
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      if (onWordLongPress) {
+        const rect = targetElem ? targetElem.getBoundingClientRect() : null;
+        onWordLongPress({
+          id,
+          word,
+          lemma: info.lemma || word,
+          sentence: info.sent || "",
+          lang,
+          rect,
+        });
+      }
+    }, 500);
+  };
+
+  const cancelPress = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const handlePointerDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    startPress(e.clientX, e.clientY, e.currentTarget);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!timerRef.current) return;
+    const dx = Math.abs(e.clientX - startPosRef.current.x);
+    const dy = Math.abs(e.clientY - startPosRef.current.y);
+    if (dx > 10 || dy > 10) {
+      cancelPress();
+    }
+  };
+
+  const handlePointerUp = () => {
+    cancelPress();
+  };
+
+  const handleClick = (e) => {
+    if (isLongPressRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      isLongPressRef.current = false;
+      return;
+    }
+    onWordClick({
+      id,
+      word,
+      lemma: info.lemma || word,
+      sentence: info.sent || "",
+      context: "",
+    });
+  };
+
+  const handleContextMenu = (e) => {
+    if (isLongPressRef.current) {
+      e.preventDefault();
+    }
+  };
+
+  return (
+    <span
+      lang={wordLang}
+      className={`word ${translated ? "word--translated" : ""}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      role="button"
+      tabIndex="0"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onWordClick({
+            id,
+            word,
+            lemma: info.lemma || word,
+            sentence: info.sent || "",
+            context: "",
+          });
+        }
+      }}
+      aria-label={translated ? `Вернуть слово ${word}` : `Перевести слово ${word}`}
+    >
+      {content}
+    </span>
+  );
+}
+
+function Node({ node, index, translations, onWordClick, onWordLongPress, meta, lang }) {
   if (!node) return null;
   if (node.t === "text") return formatTextNode(node.s);
   if (node.t === "w") {
@@ -12,35 +116,18 @@ function Node({ node, index, translations, onWordClick, meta, lang }) {
     const content = translated || word;
     const wordLang = translated ? lang : "ru";
     return (
-      <span
+      <WordSpan
         key={id}
-        lang={wordLang}
-        className={`word ${translated ? "word--translated" : ""}`}
-        onClick={() => onWordClick({
-          id: node.id,
-          word,
-          lemma: info.lemma || word,
-          sentence: info.sent || "",
-          context: "",
-        })}
-        role="button"
-        tabIndex="0"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onWordClick({
-              id: node.id,
-              word,
-              lemma: info.lemma || word,
-              sentence: info.sent || "",
-              context: "",
-            });
-          }
-        }}
-        aria-label={translated ? `Вернуть слово ${word}` : `Перевести слово ${word}`}
-      >
-        {content}
-      </span>
+        id={node.id}
+        word={word}
+        info={info}
+        translated={translated}
+        content={content}
+        wordLang={wordLang}
+        lang={lang}
+        onWordClick={onWordClick}
+        onWordLongPress={onWordLongPress}
+      />
     );
   }
 
@@ -51,6 +138,7 @@ function Node({ node, index, translations, onWordClick, meta, lang }) {
       index={idx}
       translations={translations}
       onWordClick={onWordClick}
+      onWordLongPress={onWordLongPress}
       meta={meta}
       lang={lang}
     />
@@ -62,7 +150,14 @@ function Node({ node, index, translations, onWordClick, meta, lang }) {
   return <>{children}</>;
 }
 
-export default function RichText({ nodes = [], translations = {}, onWordClick = () => {}, meta = {}, lang = "es" }) {
+export default function RichText({
+  nodes = [],
+  translations = {},
+  onWordClick = () => {},
+  onWordLongPress = () => {},
+  meta = {},
+  lang = "es",
+}) {
   return nodes.map((node, index) => (
     <Node
       key={node.t === "w" ? String(node.id) : `${index}-${node.t}`}
@@ -70,6 +165,7 @@ export default function RichText({ nodes = [], translations = {}, onWordClick = 
       index={index}
       translations={translations}
       onWordClick={onWordClick}
+      onWordLongPress={onWordLongPress}
       meta={meta}
       lang={lang}
     />
