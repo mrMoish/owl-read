@@ -184,6 +184,11 @@ def create_app(settings: Settings | None = None, fetch=None, fetch_spanish=None,
                         return FileResponse(resolved_file)
                 except (ValueError, Exception):
                     pass
+                for lang_prefix in ("en", "es", "ru"):
+                    if full_path == lang_prefix or full_path.startswith(f"{lang_prefix}/"):
+                        lang_index = s.frontend_dist / lang_prefix / "index.html"
+                        if lang_index.is_file():
+                            return FileResponse(lang_index)
             if index_file.is_file():
                 return FileResponse(index_file)
             raise HTTPException(404, "Not Found")

@@ -8,13 +8,13 @@ async function j(path, opts) {
 
 export const fetchDaily = (date, langMode = "ru") => {
   const langParam = typeof langMode === "boolean" ? (langMode ? "en" : "ru") : langMode;
-  const query = langParam === "en" ? `date=${date}&en=1` : (langParam === "es" ? `date=${date}&lang=es` : `date=${date}`);
+  const query = langParam === "en" ? `date=${date}&en=1` : (langParam === "es" ? `date=${date}&lang=es` : `date=${date}&lang=ru`);
   return j(`/api/daily?${query}`);
 };
 
 export const requestTranslations = (date, langMode = "ru") => {
   const langParam = typeof langMode === "boolean" ? (langMode ? "en" : "ru") : langMode;
-  const query = langParam === "en" ? `date=${date}&en=1` : (langParam === "es" ? `date=${date}&lang=es` : `date=${date}`);
+  const query = langParam === "en" ? `date=${date}&en=1` : (langParam === "es" ? `date=${date}&lang=es` : `date=${date}&lang=ru`);
   return j(`/api/daily/translations?${query}`, { method: "POST" });
 };
 

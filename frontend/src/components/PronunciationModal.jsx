@@ -79,8 +79,8 @@ export default function PronunciationModal({ data, onClose }) {
           className="pronunciation-play-btn"
           onClick={handlePlay}
           disabled={audioLoading}
-          aria-label="Воспроизвести произношение"
-          title="Воспроизвести"
+          aria-label={lang === "es" ? "Reproducir pronunciación" : (lang === "en" ? "Play pronunciation" : "Воспроизвести произношение")}
+          title={lang === "es" ? "Reproducir" : (lang === "en" ? "Play" : "Воспроизвести")}
         >
           {audioLoading ? (
             <span className="pronunciation-play-spinner" />
@@ -93,7 +93,7 @@ export default function PronunciationModal({ data, onClose }) {
 
         <div className="pronunciation-info">
           {loading ? (
-            <div className="pronunciation-loading" aria-label="Загрузка произношения">
+            <div className="pronunciation-loading" aria-label={lang === "es" ? "Cargando pronunciación" : (lang === "en" ? "Loading pronunciation" : "Загрузка произношения")}>
               <span className="pronunciation-spinner" />
             </div>
           ) : (
@@ -109,7 +109,7 @@ export default function PronunciationModal({ data, onClose }) {
           type="button"
           className="pronunciation-close-btn"
           onClick={onClose}
-          aria-label="Закрыть"
+          aria-label={lang === "es" ? "Cerrar" : (lang === "en" ? "Close" : "Закрыть")}
         >
           ✕
         </button>

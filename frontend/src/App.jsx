@@ -12,6 +12,7 @@ import {
 import Scripture from "./components/Scripture.jsx";
 import Comment from "./components/Comment.jsx";
 import PronunciationModal from "./components/PronunciationModal.jsx";
+import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
 
 const BUILD_ID = "2026.10.10.v5";
@@ -119,9 +120,20 @@ export default function App() {
     });
   };
 
+  const isRootPath = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
+
+  if (isRootPath) {
+    return <ModeSelector />;
+  }
+
   return (
     <>
       <main className="page">
+        <nav className="top-nav">
+          <a href="/" className="top-nav-link">
+            ← {targetLang === "es" ? "Cambiar modo" : (currentLang === "en" ? "Change mode" : "Сменить режим")}
+          </a>
+        </nav>
         {isDebug && (
           <section className="debug-panel" style={{ background: "#111", color: "#0f0", padding: "12px", borderRadius: "8px", fontSize: "12px", fontFamily: "monospace", marginBottom: "16px", wordBreak: "break-all" }}>
             <h3>[Diagnostic Panel]</h3>
@@ -163,9 +175,16 @@ export default function App() {
             {data.title && <p className="source">{data.title}</p>}
           </article>
         ) : loading ? (
-          <p className="notice" role="status">Загружаю материал дня…</p>
+          <p className="notice" role="status">
+            {targetLang === "es" ? "Cargando el texto del día…" : (currentLang === "en" ? "Loading daily text…" : "Загружаю материал дня…")}
+          </p>
         ) : (
-          <div className="notice"><p>{error}</p><button onClick={reload}>Повторить</button></div>
+          <div className="notice">
+            <p>{error}</p>
+            <button onClick={reload}>
+              {targetLang === "es" ? "Reintentar" : (currentLang === "en" ? "Retry" : "Повторить")}
+            </button>
+          </div>
         )}
       </main>
 

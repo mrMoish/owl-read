@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { formatTextNode } from "../lib/punct.js";
 
-function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceLang, targetLang, onWordClick, onWordLongPress }) {
+function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceLang = "ru", targetLang = "es", onWordClick, onWordLongPress }) {
   const timerRef = useRef(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const isLongPressRef = useRef(false);
@@ -102,7 +102,11 @@ function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceL
           });
         }
       }}
-      aria-label={translated ? `Вернуть слово ${word}` : `Перевести слово ${word}`}
+      aria-label={
+        translated
+          ? (targetLang === "es" ? `Restaurar palabra ${word}` : (targetLang === "en" ? `Restore word ${word}` : `Вернуть слово ${word}`))
+          : (targetLang === "es" ? `Traducir palabra ${word}` : (targetLang === "en" ? `Translate word ${word}` : `Перевести слово ${word}`))
+      }
     >
       {content}
     </span>

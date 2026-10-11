@@ -7,18 +7,22 @@
   ],
   "redirects": [
     { "source": "/en", "destination": "/en/", "permanent": true },
-    { "source": "/es", "destination": "/es/", "permanent": true }
+    { "source": "/es", "destination": "/es/", "permanent": true },
+    { "source": "/ru", "destination": "/ru/", "permanent": true }
   ],
   "routes": [
     { "src": "/sw.js", "headers": { "cache-control": "no-cache" } },
     { "src": "/manifest-en.webmanifest", "dest": "/manifest-en.webmanifest" },
     { "src": "/manifest-es.webmanifest", "dest": "/manifest-es.webmanifest" },
+    { "src": "/manifest-ru.webmanifest", "dest": "/manifest-ru.webmanifest" },
     { "src": "/manifest.webmanifest", "dest": "/manifest.webmanifest" },
     { "handle": "filesystem" },
     { "src": "/en/(.*)", "dest": "/en/index.html" },
     { "src": "/en/", "dest": "/en/index.html" },
     { "src": "/es/(.*)", "dest": "/es/index.html" },
     { "src": "/es/", "dest": "/es/index.html" },
+    { "src": "/ru/(.*)", "dest": "/ru/index.html" },
+    { "src": "/ru/", "dest": "/ru/index.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDaily, requestTranslations } from "./api.js";
 import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
 import { initialData, offlineState } from "./lib/offline.js";
-import { isEnglishPath, isSpanishPath } from "./lib/language.js";
+import { isEnglishPath, isSpanishPath, isRussianPath } from "./lib/language.js";
 
 export function isEnglishMode() {
   if (typeof window !== "undefined" && window.location?.pathname) {
@@ -15,6 +15,7 @@ export function activeLangMode() {
   if (typeof window !== "undefined" && window.location?.pathname) {
     if (isEnglishPath(window.location.pathname)) return "en";
     if (isSpanishPath(window.location.pathname)) return "es";
+    if (isRussianPath(window.location.pathname)) return "ru";
   }
   return "ru";
 }
