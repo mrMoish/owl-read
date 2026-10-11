@@ -1,10 +1,12 @@
 import React, { useRef } from "react";
 import { formatTextNode } from "../lib/punct.js";
 
-function WordSpan({ id, word, info, translated, content, wordLang, lang, onWordClick, onWordLongPress }) {
+function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceLang, targetLang, onWordClick, onWordLongPress }) {
   const timerRef = useRef(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const isLongPressRef = useRef(false);
+
+  const activeLang = sourceLang || (lang === "ru" ? "es" : lang);
 
   const startPress = (clientX, clientY, targetElem) => {
     isLongPressRef.current = false;
@@ -20,7 +22,7 @@ function WordSpan({ id, word, info, translated, content, wordLang, lang, onWordC
           word,
           lemma: info.lemma || word,
           sentence: info.sent || "",
-          lang,
+          lang: activeLang,
           rect,
         });
       }
@@ -105,7 +107,7 @@ function WordSpan({ id, word, info, translated, content, wordLang, lang, onWordC
   );
 }
 
-function Node({ node, index, translations, onWordClick, onWordLongPress, meta, lang }) {
+function Node({ node, index, translations, onWordClick, onWordLongPress, meta, lang, sourceLang, targetLang }) {
   if (!node) return null;
   if (node.t === "text") return formatTextNode(node.s);
   if (node.t === "w") {
@@ -114,7 +116,9 @@ function Node({ node, index, translations, onWordClick, onWordLongPress, meta, l
     const info = meta[id] || {};
     const translated = translations[id];
     const content = translated || word;
-    const wordLang = translated ? lang : "ru";
+    const effSourceLang = sourceLang || (lang === "ru" ? "es" : lang);
+    const effTargetLang = targetLang || (effSourceLang === "es" ? "ru" : (effSourceLang === "en" ? "ru" : "es"));
+    const wordLang = translated ? effTargetLang : effSourceLang;
     return (
       <WordSpan
         key={id}
@@ -125,6 +129,8 @@ function Node({ node, index, translations, onWordClick, onWordLongPress, meta, l
         content={content}
         wordLang={wordLang}
         lang={lang}
+        sourceLang={effSourceLang}
+        targetLang={effTargetLang}
         onWordClick={onWordClick}
         onWordLongPress={onWordLongPress}
       />
@@ -141,6 +147,8 @@ function Node({ node, index, translations, onWordClick, onWordLongPress, meta, l
       onWordLongPress={onWordLongPress}
       meta={meta}
       lang={lang}
+      sourceLang={sourceLang}
+      targetLang={targetLang}
     />
   )) : null;
 
@@ -157,6 +165,8 @@ export default function RichText({
   onWordLongPress = () => {},
   meta = {},
   lang = "es",
+  sourceLang,
+  targetLang,
 }) {
   return nodes.map((node, index) => (
     <Node
@@ -168,6 +178,8 @@ export default function RichText({
       onWordLongPress={onWordLongPress}
       meta={meta}
       lang={lang}
+      sourceLang={sourceLang}
+      targetLang={targetLang}
     />
   ));
 }

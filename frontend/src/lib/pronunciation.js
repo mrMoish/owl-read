@@ -203,7 +203,7 @@ function getSpanishPronunciation(word) {
     }
   }
 
-  // Build Russian Hint
+  // Build Russian Hint (Argentine Spanish es-AR / Rioplatense sheísmo/zheísmo)
   let ru = "";
   let i = 0;
   while (i < charArray.length) {
@@ -219,7 +219,7 @@ function getSpanishPronunciation(word) {
       pieceRu = "ч";
       consumed = 2;
     } else if (c === "l" && next === "l") {
-      pieceRu = "й";
+      pieceRu = "ш";
       consumed = 2;
     } else if (c === "n" && next === "g") {
       pieceRu = "нг";
@@ -264,7 +264,8 @@ function getSpanishPronunciation(word) {
       pieceRu = "нь";
       consumed = 1;
     } else if (c === "y") {
-      pieceRu = (i === charArray.length - 1) ? "й" : "й";
+      const isNextVowel = Boolean(next && vowels.has(next));
+      pieceRu = isNextVowel ? "ш" : "й";
       consumed = 1;
     } else if (c === "r" && next === "r") {
       pieceRu = "р";
@@ -312,7 +313,7 @@ function getSpanishPronunciation(word) {
     if (c === "c" && next === "h") {
       ipaChars.push("tʃ"); curr += 2;
     } else if (c === "l" && next === "l") {
-      ipaChars.push("ʝ"); curr += 2;
+      ipaChars.push("ʃ"); curr += 2;
     } else if (c === "n" && next === "g") {
       ipaChars.push("ŋ"); curr += 2;
     } else if (c === "q" && next === "u") {
@@ -337,6 +338,9 @@ function getSpanishPronunciation(word) {
       curr += 1;
     } else if (c === "ñ") {
       ipaChars.push("ɲ"); curr += 1;
+    } else if (c === "y") {
+      const isNextVowel = Boolean(next && vowels.has(next));
+      ipaChars.push(isNextVowel ? "ʃ" : "j"); curr += 1;
     } else if (c === "r" && next === "r") {
       ipaChars.push("r"); curr += 2;
     } else if (c === "r") {

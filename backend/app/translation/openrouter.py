@@ -78,6 +78,15 @@ SYSTEM_PRONUNCIATION = (
     "2) ru_hint: natural Russian pronunciation hint with stress mark (\u0301) on the stressed vowel. "
     "Return JSON only: {\"ipa\": \"[...]\", \"ru_hint\": \"...\"}"
 )
+SYSTEM_PRONUNCIATION_ES = (
+    "You are a linguistic expert and phonetician specializing in Argentine Spanish (es-AR / Rioplatense). "
+    "For the given target word in its sentence context, generate: "
+    "1) ipa: standard IPA phonetic transcription inside brackets [ ... ] adhering to Argentine Spanish pronunciation rules "
+    "(sheísmo/zheísmo: 'll' and 'y' before vowels pronounced as [ʃ] or [ʒ], seseo [s]). "
+    "2) ru_hint: natural Russian pronunciation hint with stress mark (\u0301) on the stressed vowel "
+    "(representing 'll' and 'y' before vowels as 'ш'/'ж'). "
+    "Return JSON only: {\"ipa\": \"[...]\", \"ru_hint\": \"...\"}"
+)
 
 
 class TranslationError(Exception):
@@ -177,12 +186,13 @@ class OpenRouterClient:
 
     async def generate_pronunciation(self, *, word: str, sentence: str, lang: str = "es") -> dict[str, str]:
         payload = {"word": word, "sentence": sentence, "language": lang}
+        system_prompt = SYSTEM_PRONUNCIATION_ES if lang == "es" else SYSTEM_PRONUNCIATION
         body = {
             "model": self.model,
             "temperature": 0.1,
             "response_format": {"type": "json_object"},
             "messages": [
-                {"role": "system", "content": SYSTEM_PRONUNCIATION},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
         }
