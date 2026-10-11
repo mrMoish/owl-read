@@ -163,9 +163,16 @@ export default function App() {
             {data.title && <p className="source">{data.title}</p>}
           </article>
         ) : loading ? (
-          <p className="notice" role="status">Загружаю материал дня…</p>
+          <p className="notice" role="status">
+            {targetLang === "es" ? "Cargando el texto del día…" : (currentLang === "en" ? "Loading daily text…" : "Загружаю материал дня…")}
+          </p>
         ) : (
-          <div className="notice"><p>{error}</p><button onClick={reload}>Повторить</button></div>
+          <div className="notice">
+            <p>{error}</p>
+            <button onClick={reload}>
+              {targetLang === "es" ? "Reintentar" : (currentLang === "en" ? "Retry" : "Повторить")}
+            </button>
+          </div>
         )}
       </main>
 

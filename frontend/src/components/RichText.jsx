@@ -102,7 +102,11 @@ function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceL
           });
         }
       }}
-      aria-label={translated ? `Вернуть слово ${word}` : `Перевести слово ${word}`}
+      aria-label={
+        translated
+          ? (targetLang === "es" ? `Restaurar palabra ${word}` : (targetLang === "en" ? `Restore word ${word}` : `Вернуть слово ${word}`))
+          : (targetLang === "es" ? `Traducir palabra ${word}` : (targetLang === "en" ? `Translate word ${word}` : `Перевести слово ${word}`))
+      }
     >
       {content}
     </span>
