@@ -94,7 +94,6 @@ class EpubBrochureManager:
             match = re.match(r"es(\d{2})_(\w+)\.epub", file.name)
             if match:
                 yy = int(match.group(1))
-                # Переводим 2-значный год в 4-значный (20xx)
                 year = 2000 + yy
                 if year < current_year:
                     try:
@@ -132,23 +131,24 @@ class EpubBrochureManager:
 
         try:
             with zipfile.ZipFile(epub_path, "r") as z:
-                # Поиск XHTML файла для нужного дня
                 day_num = day.day
                 month_idx = day.month - 1
                 month_name = MONTH_NAMES.get(lang, MONTH_NAMES["ru"])[month_idx]
 
-                target_xhtml = None
                 target_soup = None
 
                 for name in z.namelist():
                     if name.endswith(".xhtml") or name.endswith(".html"):
                         content = z.read(name).decode("utf-8", errors="replace")
-                        if month_name in content.lower():
+                        content_lower = content.lower()
+
+                        if month_name in content_lower:
                             soup = BeautifulSoup(content, "html.parser")
                             text = soup.get_text().lower()
-                            # Проверяем наличие номера дня и месяца
-                            if f"{day_num} {month_name}" in text or f"{month_name} {day_num}" in text or f"{day_num} {month_name}" in text:
-                                target_xhtml = name
+
+                            # Для испанского даты вида "10 de octubre", для русского "10 октября", для английского "october 10"
+                            pattern = rf"\b{day_num}\b(?:\s+de)?\s+{re.escape(month_name)}|{re.escape(month_name)}\s+\b{day_num}\b"
+                            if re.search(pattern, text):
                                 target_soup = soup
                                 break
 
@@ -165,7 +165,6 @@ class EpubBrochureManager:
                 verse_text = ""
                 verse_elem = target_soup.find("p", class_=re.compile(r"themeScrp|scrp"))
                 if not verse_elem:
-                    # Резервный поиск емфазиса / абзаца со ссылкой
                     for p in target_soup.find_all("p"):
                         if p.find("em") or p.find("a"):
                             verse_elem = p
