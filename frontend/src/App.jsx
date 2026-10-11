@@ -129,11 +129,6 @@ export default function App() {
   return (
     <>
       <main className="page">
-        <nav className="top-nav">
-          <a href="/" className="top-nav-link">
-            ← {targetLang === "es" ? "Cambiar modo" : (currentLang === "en" ? "Change mode" : "Сменить режим")}
-          </a>
-        </nav>
         {isDebug && (
           <section className="debug-panel" style={{ background: "#111", color: "#0f0", padding: "12px", borderRadius: "8px", fontSize: "12px", fontFamily: "monospace", marginBottom: "16px", wordBreak: "break-all" }}>
             <h3>[Diagnostic Panel]</h3>
