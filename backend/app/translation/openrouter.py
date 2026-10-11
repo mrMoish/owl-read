@@ -139,6 +139,37 @@ class OpenRouterClient:
     def __init__(self, api_key: str, model: str, http: httpx.AsyncClient | None = None):
         self.api_key, self.model, self._http = api_key, model, http
 
+    async def generate_tts(self, *, word: str, lang: str = "es") -> dict[str, str]:
+        prompt = f"Say the word clearly in {lang} pronunciation: {word}"
+        body = {
+            "model": "openai/gpt-audio-mini",
+            "modalities": ["text", "audio"],
+            "audio": {"voice": "alloy", "format": "mp3"},
+            "messages": [
+                {"role": "user", "content": prompt},
+            ],
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "X-Title": "Daily Reader"}
+        own = self._http is None
+        http = self._http or httpx.AsyncClient(timeout=30)
+        try:
+            r = await http.post(URL, json=body, headers=headers)
+            r.raise_for_status()
+            res_json = r.json()
+            message = res_json["choices"][0]["message"]
+            audio_info = message.get("audio") or {}
+            audio_b64 = audio_info.get("data", "")
+            audio_format = audio_info.get("format", "mp3")
+            if not audio_b64:
+                raise TranslationError("No audio returned from model")
+            return {"audio_b64": audio_b64, "format": audio_format}
+        except Exception as e:
+            log.warning("generate_tts failed: %s", e)
+            raise TranslationError(f"TTS generation failed: {e}") from e
+        finally:
+            if own:
+                await http.aclose()
+
     async def generate_pronunciation(self, *, word: str, sentence: str, lang: str = "es") -> dict[str, str]:
         payload = {"word": word, "sentence": sentence, "language": lang}
         body = {

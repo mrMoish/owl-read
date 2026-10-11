@@ -112,7 +112,7 @@ export default function App() {
   const handleWordLongPress = ({ word, lang, rect }) => {
     setPronunciationWordData({
       word,
-      lang: lang || currentLang,
+      lang: lang || targetLang,
       rect,
     });
   };

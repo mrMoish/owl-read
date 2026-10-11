@@ -24,6 +24,12 @@ export const translateWord = (payload) => j(`/api/translate`, {
   body: JSON.stringify(payload),
 });
 
+export const fetchTtsAudio = (payload) => j(`/api/tts`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+});
+
 export const fetchPronunciation = (payload) => j(`/api/pronunciation`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },

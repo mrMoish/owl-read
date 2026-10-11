@@ -2,9 +2,9 @@
  * Utility for word pronunciation audio playback and generating
  * phonetic transcription (IPA) and Russian pronunciation hints.
  */
-import { fetchPronunciation } from "../api.js";
+import { fetchPronunciation, fetchTtsAudio } from "../api.js";
 
-export function speakWord(text, lang = "es") {
+function fallbackSpeechSynthesis(text, lang) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     return;
   }
@@ -24,6 +24,23 @@ export function speakWord(text, lang = "es") {
   } catch (e) {
     console.error("SpeechSynthesis error:", e);
   }
+}
+
+export async function speakWord(text, lang = "es") {
+  const clean = text.trim();
+  if (!clean) return;
+  try {
+    const res = await fetchTtsAudio({ word: clean, lang });
+    if (res && res.audio_b64) {
+      const mime = res.format === "mp3" ? "audio/mp3" : "audio/wav";
+      const audio = new Audio(`data:${mime};base64,${res.audio_b64}`);
+      await audio.play();
+      return;
+    }
+  } catch (e) {
+    // OpenRouter TTS unavailable, fallback to Web Speech API
+  }
+  fallbackSpeechSynthesis(clean, lang);
 }
 
 // Common English words dictionary (lower-cased)

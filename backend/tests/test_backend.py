@@ -329,3 +329,34 @@ def test_format_text_node_and_analyzer_punctuation_binding():
     texts = [n["s"] for n in out_blocks[0]["nodes"] if n["t"] == "text"]
     assert any("\u00a0—" in t for t in texts)
     assert not any(" ," in t for t in texts)
+
+
+def test_tts_endpoint(tmp_path):
+    def handler(request):
+        return httpx.Response(200, json={
+            "choices": [{
+                "message": {
+                    "audio": {
+                        "data": "ZHVtbXkgYXVkaW8=",
+                        "format": "mp3"
+                    }
+                }
+            }]
+        })
+
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    orig = o.OpenRouterClient.__init__
+    def init(self, k, m, h=None): orig(self, k, m, http)
+    o.OpenRouterClient.__init__ = init
+    try:
+        s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="key")
+        app = create_app(s)
+        c = TestClient(app)
+        res = c.post("/api/tts", json={"word": "esposos", "lang": "es"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["audio_b64"] == "ZHVtbXkgYXVkaW8="
+        assert data["format"] == "mp3"
+    finally:
+        o.OpenRouterClient.__init__ = orig

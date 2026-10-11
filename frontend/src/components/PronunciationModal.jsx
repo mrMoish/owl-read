@@ -2,10 +2,16 @@ import React, { useEffect, useState } from "react";
 import { fetchAiPronunciation, getPronunciation, speakWord } from "../lib/pronunciation.js";
 
 export default function PronunciationModal({ data, onClose }) {
-  if (!data || !data.word) return null;
+  const word = data?.word || "";
+  const sentence = data?.sentence || "";
+  const lang = data?.lang || "es";
 
-  const { word, sentence = "", lang = "es" } = data;
   const [pronData, setPronData] = useState(() => getPronunciation(word, lang));
+
+  useEffect(() => {
+    if (!word) return;
+    setPronData(getPronunciation(word, lang));
+  }, [word, lang]);
 
   // Fetch AI pronunciation on mount and update state
   useEffect(() => {
@@ -40,6 +46,8 @@ export default function PronunciationModal({ data, onClose }) {
     e.stopPropagation();
     speakWord(word, lang);
   };
+
+  if (!data || !data.word) return null;
 
   const { ipa, ruHint } = pronData;
 
