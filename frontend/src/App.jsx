@@ -67,7 +67,7 @@ export default function App() {
   const lastApiUrl = data?.date ? `/api/daily?date=${data.date}${isEn ? "&en=1" : ""}` : "N/A";
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
-    if (!data?.date || !sentence) {
+    if (!word) {
       return;
     }
     const key = String(id);
@@ -84,19 +84,21 @@ export default function App() {
     // 1. Получаем перевод для нажатого слова (подготовленный или fallback)
     let translated = data?.translations?.[key];
     if (!translated || translated === word) {
+      const effectiveSentence = sentence || context || articleContext(data) || word;
+      const effectiveContext = context || articleContext(data) || effectiveSentence;
       try {
         const payload = {
           word,
           lemma: lemma || word,
-          sentence,
-          context: context || articleContext(data),
-          date: data.date,
+          sentence: effectiveSentence,
+          context: effectiveContext,
+          date: data?.date || "",
           lang: currentLang,
         };
         const res = await translateWord(payload);
         translated = res?.translation || res?.original || word;
-      } catch {
-        // Ошибка перевода не ломает UX.
+      } catch (err) {
+        console.warn(`Translation request failed for word "${word}":`, err?.message || err);
       }
     }
 

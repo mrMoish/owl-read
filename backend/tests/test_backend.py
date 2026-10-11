@@ -440,3 +440,44 @@ def test_phrase_tokenization_and_multiword_translation():
     out_caps, meta_caps, _ = analyze_blocks(es_caps_blocks, lang="es")
     words_caps = [n["s"] for n in out_caps[0]["nodes"] if n["t"] == "w"]
     assert "Ni siquiera" in words_caps
+
+
+def test_analyze_blocks_links_and_context_fallback():
+    """Проверяет токенизацию слов внутри ссылок <a>, форматирования и фоллбэк контекста предложения."""
+    blocks = [
+        {
+            "nodes": [
+                {"t": "text", "s": " First paragraph text. "},
+                {"t": "a", "href": "https://jw.org", "c": [{"t": "text", "s": "Clickable link word"}]},
+                {"t": "text", "s": " after link."}
+            ]
+        },
+        {
+            "nodes": [
+                {"t": "strong", "c": [{"t": "em", "c": [{"t": "text", "s": "No Punctuation Text"}]}]}
+            ]
+        }
+    ]
+
+    out, meta, _ = analyze_blocks(blocks, lang="en")
+
+    # Words inside link <a> are interactive `w` nodes
+    link_nodes = [n for n in out[0]["nodes"] if n["t"] == "a"]
+    assert len(link_nodes) == 1
+    link_node = link_nodes[0]
+    link_w_nodes = [n for n in link_node["c"] if n["t"] == "w"]
+    assert len(link_w_nodes) == 3
+    assert [n["s"] for n in link_w_nodes] == ["Clickable", "link", "word"]
+
+    # Every interactive word has a metadata entry and non-empty sentence context
+    assert len(meta) > 0
+    for w_id, entry in meta.items():
+        assert entry["w"]
+        assert entry["sent"], f"Missing sentence for word ID {w_id}"
+
+    # Verify context fallback for paragraph 2 without ending punctuation
+    p2_words = [m["w"] for m in meta.values() if m["w"] in ("No", "Punctuation", "Text")]
+    assert len(p2_words) == 3
+    for m in meta.values():
+        if m["w"] == "Punctuation":
+            assert m["sent"] == "No Punctuation Text"

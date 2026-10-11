@@ -184,20 +184,18 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0, lang: str = "ru"):
     for blk in blocks:
         ctx = _Ctx(_plain(blk["nodes"]))
 
-        def walk(nodes, in_link):
+        def walk(nodes):
             nonlocal nid
             res = []
             for n in nodes:
                 if n["t"] != "text":
-                    res.append({**n, "c": walk(n.get("c", []), in_link or n["t"] == "a")})
+                    res.append({**n, "c": walk(n.get("c", []))})
                     continue
                 s, base, last = n["s"], ctx.pos, 0
                 for m in word_re.finditer(s):
-                    j = None
-                    if not in_link:
-                        sstart, sent = ctx.sentence(base + m.start())
-                        first = not re.search(r"\w", ctx.plain[sstart:base + m.start()])
-                        j = judge(m.group(), first, lang=lang)
+                    sstart, sent = ctx.sentence(base + m.start())
+                    first = not re.search(r"\w", ctx.plain[sstart:base + m.start()])
+                    j = judge(m.group(), first, lang=lang)
                     if j:
                         if m.start() > last:
                             res.append({"t": "text", "s": format_text_node(s[last:m.start()])})
@@ -210,7 +208,7 @@ def analyze_blocks(blocks: list[dict], start_id: int = 0, lang: str = "ru"):
                 ctx.pos += len(s)
             return _merge(res)
 
-        out_blocks.append({**blk, "nodes": walk(blk["nodes"], False)})
+        out_blocks.append({**blk, "nodes": walk(blk["nodes"])})
     return out_blocks, meta, nid
 
 

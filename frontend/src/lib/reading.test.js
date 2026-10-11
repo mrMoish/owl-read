@@ -285,3 +285,83 @@ test("formatTextNode converts space before dash to non-breaking space and glues 
   assert.equal(formatTextNode("слово , которое"), "слово, которое");
   assert.equal(formatTextNode(" ( « цитата » )"), " (\u00A0«\u00A0цитата»)");
 });
+
+test("Clicking words in multi-paragraph text across first and second halves", () => {
+  const meta = {
+    "0": { w: "First", lemma: "first", sent: "First paragraph sentence." },
+    "1": { w: "paragraph", lemma: "paragraph", sent: "First paragraph sentence." },
+    "50": { w: "Second", lemma: "second", sent: "Second paragraph sentence." },
+    "51": { w: "paragraph", lemma: "paragraph", sent: "Second paragraph sentence." },
+  };
+
+  const learned1 = addLearnedWord(meta["0"].lemma, "Primero");
+  assert.equal(learned1["first"]?.primaryTranslation, "Primero");
+
+  const learned2 = addLearnedWord(meta["50"].lemma, "Segundo");
+  assert.equal(learned2["second"]?.primaryTranslation, "Segundo");
+
+  const visible = applyLearnedTranslations({
+    meta,
+    learnedWords: loadLearnedWords(),
+  });
+
+  assert.equal(visible["0"], "Primero");
+  assert.equal(visible["50"], "Segundo");
+});
+
+test("Words inside links, emphasis, and strong formatting retain interactive metadata", () => {
+  const meta = {
+    "10": { w: "linked", lemma: "link", sent: "This is a linked word in a link." },
+    "11": { w: "emphasized", lemma: "emphasize", sent: "This is an emphasized word." },
+    "12": { w: "bold", lemma: "bold", sent: "This is a bold word." },
+  };
+
+  const learned = {
+    link: { lemma: "link", primaryTranslation: "соединённый", translations: ["соединённый"] },
+    emphasize: { lemma: "emphasize", primaryTranslation: "выделенный", translations: ["выделенный"] },
+    bold: { lemma: "bold", primaryTranslation: "жирный", translations: ["жирный"] },
+  };
+
+  const visible = applyLearnedTranslations({
+    meta,
+    learnedWords: learned,
+  });
+
+  assert.equal(visible["10"], "соединённый");
+  assert.equal(visible["11"], "выделенный");
+  assert.equal(visible["12"], "жирный");
+});
+
+test("Missing or incomplete word metadata or sentence context fallback", () => {
+  const meta = {
+    "100": { w: "orphan", lemma: "orphan" }, // missing sent
+    "101": { w: "empty", lemma: "empty", sent: "" }, // empty sent
+  };
+
+  const learned = {
+    orphan: { lemma: "orphan", primaryTranslation: "сирота", translations: ["сирота"] },
+    empty: { lemma: "empty", primaryTranslation: "пустой", translations: ["пустой"] },
+  };
+
+  const visible = applyLearnedTranslations({
+    meta,
+    learnedWords: learned,
+  });
+
+  assert.equal(visible["100"], "сирота");
+  assert.equal(visible["101"], "пустой");
+});
+
+test("Reading modes: English, Spanish, and Russian mode metadata lookup", () => {
+  const enMeta = { "1": { w: "peace", lemma: "peace", sent: "May you have peace." } };
+  const esMeta = { "1": { w: "paz", lemma: "paz", sent: "Que tengan paz." } };
+  const ruMeta = { "1": { w: "мир", lemma: "мир", sent: "Да будет мир." } };
+
+  const learnedEn = { peace: { lemma: "peace", primaryTranslation: "мир", translations: ["мир"] } };
+  const learnedEs = { paz: { lemma: "paz", primaryTranslation: "мир", translations: ["мир"] } };
+  const learnedRu = { мир: { lemma: "мир", primaryTranslation: "paz", translations: ["paz"] } };
+
+  assert.equal(applyLearnedTranslations({ meta: enMeta, learnedWords: learnedEn })["1"], "мир");
+  assert.equal(applyLearnedTranslations({ meta: esMeta, learnedWords: learnedEs })["1"], "мир");
+  assert.equal(applyLearnedTranslations({ meta: ruMeta, learnedWords: learnedRu })["1"], "paz");
+});
