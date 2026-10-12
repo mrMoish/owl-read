@@ -11,6 +11,7 @@ export default defineConfig({
         "ru-es": resolve(__dirname, "ru-es/index.html"),
         "es-ru": resolve(__dirname, "es-ru/index.html"),
         "ru-es-translit": resolve(__dirname, "ru-es-translit/index.html"),
+        "es-ru-translit": resolve(__dirname, "es-ru-translit/index.html"),
         "en-ru": resolve(__dirname, "en-ru/index.html"),
         s1: resolve(__dirname, "s1/index.html"),
         s2: resolve(__dirname, "s2/index.html"),

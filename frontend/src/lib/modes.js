@@ -10,8 +10,8 @@ export const MODES = {
     target: "es",
     transliterate: false,
     pair: "ru → es",
-    title: "Для русскоговорящих",
-    subtitle: "Русскоговорящие учат испанский",
+    title: "Для тех кто учит русский и знает алфавит",
+    subtitle: "для тех кто учит русский и знает алфавит",
     description: "Ежедневное чтение на русском с переводом на испанский при нажатии на слова.",
   },
   "es-ru": {
@@ -22,7 +22,7 @@ export const MODES = {
     transliterate: false,
     pair: "es → ru",
     title: "Para hispanohablantes",
-    subtitle: "Испаноговорящие учат русский",
+    subtitle: "для тех кто учит испанский и знает алфавит",
     description: "Lectura diaria en español con traducción al ruso al tocar cada palabra.",
   },
   "ru-es-translit": {
@@ -32,9 +32,9 @@ export const MODES = {
     target: "es",
     transliterate: true,
     pair: "ru → es (транслитерация)",
-    title: "Для русскоговорящих (с транслитерацией)",
-    subtitle: "Русскоговорящие учат испанский с транслитерацией",
-    description: "Ежедневное чтение на русском с транслитерацией слова и переводом.",
+    title: "Для тех кто учит русский но не знает алфавит",
+    subtitle: "для тех кто учит русский но не знает алфавит",
+    description: "Ежедневное чтение на русском с транслитерацией текста и переводом.",
   },
   "en-ru": {
     id: "en-ru",
@@ -43,9 +43,20 @@ export const MODES = {
     target: "ru",
     transliterate: false,
     pair: "en → ru",
-    title: "Для русскоговорящих",
-    subtitle: "Русскоговорящие учат английский",
+    title: "Для тех кто учит английский и знает алфавит",
+    subtitle: "для тех кто учит английский и знает алфавит",
     description: "Ежедневное чтение на английском с переводом на русский при нажатии на слова.",
+  },
+  "es-ru-translit": {
+    id: "es-ru-translit",
+    path: "/es-ru-translit/",
+    source: "es",
+    target: "ru",
+    transliterate: true,
+    pair: "es → ru (транслитерация)",
+    title: "Para hispanohablantes (nivel inicial)",
+    subtitle: "для испаноговорящих: учит русский (начальный уровень, не знает алфавит)",
+    description: "Lectura diaria en español con transliteración del texto en ruso al tocar cada palabra.",
   },
 };
 
@@ -57,6 +68,7 @@ export function getModeByPath(pathname = "") {
 
   // Canonical routes
   if (path.startsWith("/ru-es-translit")) return MODES["ru-es-translit"];
+  if (path.startsWith("/es-ru-translit")) return MODES["es-ru-translit"];
   if (path.startsWith("/ru-es")) return MODES["ru-es"];
   if (path.startsWith("/es-ru")) return MODES["es-ru"];
   if (path.startsWith("/en-ru")) return MODES["en-ru"];
