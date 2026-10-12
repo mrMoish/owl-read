@@ -154,18 +154,6 @@ export default function App() {
   return (
     <>
       <main className="page">
-        <div style={{ textAlign: "right", marginBottom: "8px" }}>
-          <a
-            href="/?select=true"
-            style={{
-              fontSize: "12px",
-              color: "#666",
-              textDecoration: "underline",
-            }}
-          >
-            Сменить режим / Cambiar modo
-          </a>
-        </div>
         {/* TEMPORARY FEATURE: Navigation button on /ru-es/ to switch to /ru-es-translit/. Intended for future removal. */}
         {mode.id === "ru-es" && (
           <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
