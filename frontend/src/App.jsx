@@ -4,7 +4,10 @@ import {
   loadLearnedWords,
   addLearnedWord,
   removeLearnedWord,
+  loadSmoothSettings,
+  saveSmoothSettings,
 } from "./lib/storage.js";
+import { pickShown } from "./lib/selection.js";
 import {
   normalizeLemma,
   applyLearnedTranslations,
@@ -12,6 +15,7 @@ import {
 import Scripture from "./components/Scripture.jsx";
 import Comment from "./components/Comment.jsx";
 import PronunciationModal from "./components/PronunciationModal.jsx";
+import SettingsFab from "./components/SettingsFab.jsx";
 import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
 import { transliterateBlock, transliterateRussianToLatin } from "./lib/transliteration.js";
@@ -36,6 +40,12 @@ export default function App() {
   const { data, loading, error, notice, reload, mode } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
   const [pronunciationWordData, setPronunciationWordData] = useState(null);
+  const [smoothConfig, setSmoothConfig] = useState(() => loadSmoothSettings(mode.id));
+
+  // Clear token translations and sync smooth settings when date or mode changes
+  useEffect(() => {
+    setSmoothConfig(loadSmoothSettings(mode.id));
+  }, [mode.id]);
   const [loadingTokens, setLoadingTokens] = useState({});
   const [tokenTranslations, setTokenTranslations] = useState({});
   const [frontendCache, setFrontendCache] = useState({});
@@ -57,8 +67,23 @@ export default function App() {
     }
   }, []);
 
+  const smoothTranslations = useMemo(() => {
+    if (!smoothConfig.enabled || !data?.meta?.order || !data?.translations) {
+      return {};
+    }
+    const shownSet = pickShown(data.meta.order, data.translations, smoothConfig.percent);
+    const res = {};
+    for (const id of shownSet) {
+      if (data.translations[id]) {
+        res[id] = data.translations[id];
+      }
+    }
+    return res;
+  }, [smoothConfig.enabled, smoothConfig.percent, data?.meta?.order, data?.translations]);
+
   const visibleTranslations = useMemo(() => {
     const combinedPrepared = {
+      ...smoothTranslations,
       ...(data?.translations || {}),
       ...tokenTranslations,
     };
@@ -67,9 +92,14 @@ export default function App() {
       preparedTranslations: combinedPrepared,
       learnedWords,
     });
-    if (mode.id === "es-ru-translit" && raw) {
+    const merged = {
+      ...smoothTranslations,
+      ...tokenTranslations,
+      ...raw,
+    };
+    if (mode.id === "es-ru-translit" && merged) {
       const transliterated = {};
-      for (const [k, val] of Object.entries(raw)) {
+      for (const [k, val] of Object.entries(merged)) {
         if (typeof val === "string") {
           transliterated[k] = transliterateRussianToLatin(val);
         } else {
@@ -78,8 +108,33 @@ export default function App() {
       }
       return transliterated;
     }
-    return raw;
-  }, [data?.meta, data?.translations, tokenTranslations, learnedWords, mode.id]);
+    return merged;
+  }, [smoothTranslations, data?.translations, tokenTranslations, learnedWords, data?.meta, mode.id]);
+
+  const handleSmoothToggle = (enabled) => {
+    const updated = { ...smoothConfig, enabled };
+    setSmoothConfig(updated);
+    saveSmoothSettings(mode.id, updated);
+  };
+
+  const handleSmoothPercentChange = (percent) => {
+    const updated = { ...smoothConfig, percent };
+    setSmoothConfig(updated);
+    saveSmoothSettings(mode.id, updated);
+  };
+
+  const handleBlockCompleted = (blockIndex, clickCount) => {
+    if (!smoothConfig.enabled) return;
+    const delta = clickCount >= 2 ? -3 : 3;
+    setSmoothConfig((prev) => {
+      if (!prev.enabled) return prev;
+      const nextPercent = Math.min(100, Math.max(0, prev.percent + delta));
+      if (nextPercent === prev.percent) return prev;
+      const updated = { ...prev, percent: nextPercent };
+      saveSmoothSettings(mode.id, updated);
+      return updated;
+    });
+  };
 
   const sourceLang = mode.source;
   const targetLang = mode.target;
@@ -274,6 +329,7 @@ export default function App() {
               sourceLang={sourceLang}
               targetLang={targetLang}
               lang={targetLang}
+              onBlockCompleted={handleBlockCompleted}
             />
             {data.title && <p className="source">{data.title}</p>}
           </article>
@@ -295,6 +351,15 @@ export default function App() {
         <PronunciationModal
           data={pronunciationWordData}
           onClose={() => setPronunciationWordData(null)}
+        />
+      )}
+
+      {!isRootPath && (
+        <SettingsFab
+          mode={mode}
+          smoothConfig={smoothConfig}
+          onSmoothToggle={handleSmoothToggle}
+          onSmoothPercentChange={handleSmoothPercentChange}
         />
       )}
     </>

@@ -79,3 +79,25 @@ export const saveUserSettings = (settings) => safe(() => {
   localStorage.setItem("reader.settings", JSON.stringify(updated));
   return updated;
 });
+
+export const loadSmoothSettings = (modeId = "ru-es") => safe(() => {
+  const settings = loadUserSettings();
+  const smoothMap = settings.smoothMap || {};
+  const modeSettings = smoothMap[modeId] || {};
+  return {
+    enabled: Boolean(modeSettings.enabled ?? false),
+    percent: typeof modeSettings.percent === "number" ? modeSettings.percent : 10,
+  };
+}, { enabled: false, percent: 10 });
+
+export const saveSmoothSettings = (modeId = "ru-es", smoothConfig = {}) => safe(() => {
+  const settings = loadUserSettings();
+  const smoothMap = { ...(settings.smoothMap || {}) };
+  const currentModeSettings = smoothMap[modeId] || { enabled: false, percent: 10 };
+  smoothMap[modeId] = {
+    ...currentModeSettings,
+    ...smoothConfig,
+  };
+  saveUserSettings({ smoothMap });
+  return smoothMap[modeId];
+}, { enabled: false, percent: 10 });
