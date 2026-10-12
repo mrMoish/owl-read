@@ -16,7 +16,7 @@ import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
 import { transliterateBlock, transliterateRussianToLatin } from "./lib/transliteration.js";
 
-const BUILD_ID = "2026.10.10.v11";
+const BUILD_ID = "2026.10.10.v12";
 
 function flattenText(nodes) {
   return nodes.map((n) => {
@@ -145,11 +145,11 @@ export default function App() {
   return (
     <>
       <main className="page">
-        {/* TEMPORARY FEATURE: Navigation button on /ru-es/ to switch to /ru-es-translit/. Intended for future removal. */}
-        {mode.id === "ru-es" && (
+        {/* TEMPORARY FEATURE: Navigation button on /es-ru/ (or /ru-es/) to switch to /es-ru-translit/. Intended for future removal. */}
+        {(mode.id === "es-ru" || mode.id === "ru-es") && (
           <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
             <a
-              href="/ru-es-translit/"
+              href="/es-ru-translit/"
               className="temp-nav-btn"
               style={{
                 display: "inline-block",
