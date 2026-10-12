@@ -10,6 +10,8 @@ test("Transliterate Russian to Latin phonetic representation", () => {
   assert.equal(transliterateRussianToLatin("Почтительный"), "Pochtitel'nyy");
   assert.equal(transliterateRussianToLatin("Иегова"), "Iegova");
   assert.equal(transliterateRussianToLatin("любовь"), "lyubov'");
+  assert.equal(transliterateRussianToLatin("Быть"), "Bit'");
+  assert.equal(transliterateRussianToLatin("объявленными"), "obyavlennymi");
 });
 
 test("Transliterate Spanish to Cyrillic phonetic representation", () => {

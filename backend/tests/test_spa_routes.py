@@ -8,7 +8,7 @@ def test_spa_routes_serve_index(tmp_path):
     dist.mkdir()
     (dist / "index.html").write_text("root")
 
-    for route in ("ru-es", "es-ru", "ru-es-translit", "en-ru", "en", "es", "ru", "s1", "s2", "s3", "s4"):
+    for route in ("ru-es", "es-ru", "ru-es-translit", "es-ru-translit", "en-ru", "en", "es", "ru", "s1", "s2", "s3", "s4"):
         r_dir = dist / route
         r_dir.mkdir()
         (r_dir / "index.html").write_text(f"html for {route}")
@@ -26,6 +26,7 @@ def test_spa_routes_serve_index(tmp_path):
     assert client.get("/ru-es/").text == "html for ru-es"
     assert client.get("/es-ru/").text == "html for es-ru"
     assert client.get("/ru-es-translit/").text == "html for ru-es-translit"
+    assert client.get("/es-ru-translit/").text == "html for es-ru-translit"
     assert client.get("/en-ru/").text == "html for en-ru"
 
     # Legacy routes return their specific index.html

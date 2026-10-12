@@ -14,9 +14,9 @@ import Comment from "./components/Comment.jsx";
 import PronunciationModal from "./components/PronunciationModal.jsx";
 import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
-import { transliterateBlock } from "./lib/transliteration.js";
+import { transliterateBlock, transliterateRussianToLatin } from "./lib/transliteration.js";
 
-const BUILD_ID = "2026.10.10.v9";
+const BUILD_ID = "2026.10.10.v14";
 
 function flattenText(nodes) {
   return nodes.map((n) => {
@@ -49,19 +49,31 @@ export default function App() {
   }, []);
 
   const visibleTranslations = useMemo(() => {
-    return applyLearnedTranslations({
+    const raw = applyLearnedTranslations({
       meta: data?.meta,
       preparedTranslations: data?.translations,
       learnedWords,
     });
-  }, [data?.meta, data?.translations, learnedWords]);
+    if (mode.id === "es-ru-translit" && raw) {
+      const transliterated = {};
+      for (const [k, val] of Object.entries(raw)) {
+        if (typeof val === "string") {
+          transliterated[k] = transliterateRussianToLatin(val);
+        } else {
+          transliterated[k] = val;
+        }
+      }
+      return transliterated;
+    }
+    return raw;
+  }, [data?.meta, data?.translations, learnedWords, mode.id]);
 
   const sourceLang = mode.source;
   const targetLang = mode.target;
 
   const displayVerse = useMemo(() => {
     if (!data?.verse) return null;
-    if (mode.transliterate) {
+    if (mode.transliterate && mode.source === "ru") {
       return transliterateBlock(data.verse, sourceLang, targetLang);
     }
     return data.verse;
@@ -69,7 +81,7 @@ export default function App() {
 
   const displayComment = useMemo(() => {
     if (!data?.comment) return [];
-    if (mode.transliterate) {
+    if (mode.transliterate && mode.source === "ru") {
       return data.comment.map((b) => transliterateBlock(b, sourceLang, targetLang));
     }
     return data.comment;
@@ -151,6 +163,28 @@ export default function App() {
               }}
             >
               Leer más rápido
+            </a>
+          </div>
+        )}
+
+        {/* TEMPORARY FEATURE: Navigation button on /ru-es-translit/ to switch to /es-ru-translit/. Intended for future removal. */}
+        {mode.id === "ru-es-translit" && (
+          <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
+            <a
+              href="/es-ru-translit/"
+              className="temp-nav-btn"
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                backgroundColor: "#0F6B63",
+                color: "#FFFFFF",
+                borderRadius: "20px",
+                textDecoration: "none",
+                fontWeight: "500",
+                fontSize: "14px",
+              }}
+            >
+              Leer en español
             </a>
           </div>
         )}
