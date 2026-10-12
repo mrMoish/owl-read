@@ -71,13 +71,12 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 .word--loading {
   color: #889690;
   cursor: wait;
-  font-weight: 500;
 }
 
 .word-letter {
   display: inline;
   color: #889690;
-  opacity: 0.65;
+  opacity: 0.6;
   transition: opacity 0.1s ease;
   animation-name: letterHighlight;
   animation-iteration-count: infinite;
@@ -87,20 +86,19 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 @keyframes letterHighlight {
   0% {
     color: #889690;
-    opacity: 0.65;
+    opacity: 0.6;
   }
   20% {
     color: var(--ink);
     opacity: 1;
-    font-weight: 700;
   }
   40% {
     color: #889690;
-    opacity: 0.65;
+    opacity: 0.6;
   }
   100% {
     color: #889690;
-    opacity: 0.65;
+    opacity: 0.6;
   }
 }
 
