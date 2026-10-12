@@ -17,6 +17,7 @@ from .epub import EpubBrochureManager, EpubError
 log = logging.getLogger("reader")
 
 
+
 def _resolve_lang(lang_param: str | None, en_param: str | None) -> str:
     if en_param is not None or lang_param == "en":
         return "en"
