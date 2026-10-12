@@ -102,11 +102,10 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
                           date, active_lang, e, elapsed)
             raise HTTPException(500, f"Внутренняя ошибка сервера: {e}")
 
-        translations, status = tr.cached(content, lang=active_lang)
-        res = daily.public(content, translations, status, notice)
+        res = daily.public(content, {}, "ondemand", notice)
         elapsed = time.monotonic() - start_time
-        log.info("[API Daily Success] GET /api/daily completed: date=%s lang=%s translations_status=%s notice=%s duration=%.3fs",
-                 res.get("date"), active_lang, status, notice, elapsed)
+        log.info("[API Daily Success] GET /api/daily completed: date=%s lang=%s notice=%s duration=%.3fs",
+                 res.get("date"), active_lang, notice, elapsed)
         return res
 
     @app.post("/api/daily/translations")

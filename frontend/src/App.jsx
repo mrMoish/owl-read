@@ -36,9 +36,17 @@ export default function App() {
   const { data, loading, error, notice, reload, mode } = useDaily();
   const [learnedWords, setLearnedWords] = useState(() => loadLearnedWords());
   const [pronunciationWordData, setPronunciationWordData] = useState(null);
+  const [loadingTokens, setLoadingTokens] = useState({});
+  const [tokenTranslations, setTokenTranslations] = useState({});
 
   const [isDebug, setIsDebug] = useState(false);
   const [swControlled, setSwControlled] = useState(false);
+
+  // Clear token translations and loading states when date or mode changes
+  useEffect(() => {
+    setTokenTranslations({});
+    setLoadingTokens({});
+  }, [data?.date, mode.id]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -49,9 +57,13 @@ export default function App() {
   }, []);
 
   const visibleTranslations = useMemo(() => {
+    const combinedPrepared = {
+      ...(data?.translations || {}),
+      ...tokenTranslations,
+    };
     const raw = applyLearnedTranslations({
       meta: data?.meta,
-      preparedTranslations: data?.translations,
+      preparedTranslations: combinedPrepared,
       learnedWords,
     });
     if (mode.id === "es-ru-translit" && raw) {
@@ -66,7 +78,7 @@ export default function App() {
       return transliterated;
     }
     return raw;
-  }, [data?.meta, data?.translations, learnedWords, mode.id]);
+  }, [data?.meta, data?.translations, tokenTranslations, learnedWords, mode.id]);
 
   const sourceLang = mode.source;
   const targetLang = mode.target;
@@ -92,36 +104,63 @@ export default function App() {
       return;
     }
     const key = String(id);
+    if (loadingTokens[key]) {
+      return;
+    }
+
     const normLemma = normalizeLemma(lemma || word);
     const isCurrentlyTranslated = Boolean(visibleTranslations[key]);
 
     if (isCurrentlyTranslated) {
       const nextLearned = removeLearnedWord(normLemma);
       setLearnedWords(nextLearned || {});
+      setTokenTranslations((prev) => {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      });
       return;
     }
 
-    let translated = data?.translations?.[key];
-    if (!translated || translated === word) {
-      try {
-        const payload = {
-          word,
-          lemma: lemma || word,
-          sentence,
-          context: context || articleContext(data),
-          date: data.date,
-          lang: sourceLang,
-        };
-        const res = await translateWord(payload);
-        translated = res?.translation || res?.original || word;
-      } catch {
-        // Fallback
-      }
+    const currentDate = data.date;
+    const currentModeId = mode.id;
+    setLoadingTokens((prev) => ({ ...prev, [key]: true }));
+
+    let translated = null;
+    try {
+      const payload = {
+        word,
+        lemma: lemma || word,
+        sentence,
+        context: context || articleContext(data),
+        date: currentDate,
+        lang: sourceLang,
+      };
+      const res = await translateWord(payload);
+      translated = res?.translation || res?.original || word;
+    } catch {
+      // Translation request failed
+    } finally {
+      setLoadingTokens((prev) => {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      });
     }
 
     if (!translated || translated === word) {
       return;
     }
+
+    // Guard against stale response if user switched date or mode while request was pending
+    if (data?.date !== currentDate || mode.id !== currentModeId) {
+      return;
+    }
+
+    setTokenTranslations((prev) => ({
+      ...prev,
+      [key]: translated,
+    }));
 
     const nextLearned = addLearnedWord(normLemma, translated);
     setLearnedWords(nextLearned || {});
@@ -208,6 +247,7 @@ export default function App() {
               <Scripture
                 block={displayVerse}
                 translations={visibleTranslations}
+                loadingTokens={loadingTokens}
                 onWordClick={handleWordClick}
                 onWordLongPress={handleWordLongPress}
                 meta={data.meta || {}}
@@ -219,6 +259,7 @@ export default function App() {
             <Comment
               blocks={displayComment}
               translations={visibleTranslations}
+              loadingTokens={loadingTokens}
               onWordClick={handleWordClick}
               onWordLongPress={handleWordLongPress}
               meta={data.meta || {}}

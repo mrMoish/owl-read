@@ -41,21 +41,6 @@ export function useDaily() {
       let data = await fetchDaily(date, langKey);
       saveDaily(data, langKey);
       setState({ data, loading: false, error: null, notice: data.notice, isEn: langKey === "en", langMode: langKey, mode: currentMode });
-
-      if (data.translations_status === "pending" || data.translations_status === "partial") {
-        try {
-          const t = await requestTranslations(date, langKey);
-          data = {
-            ...data,
-            translations: { ...(data.translations || {}), ...(t.translations || {}) },
-            translations_status: t.translations_status,
-          };
-          saveDaily(data, langKey);
-          setState((s) => ({ ...s, data }));
-        } catch {
-          // Если фоновый перевод не удался, слова останутся исходными
-        }
-      }
     } catch (e) {
       // Сети нет: показываем сохранённый выпуск любой даты — обязательно с пометкой
       setState((s) => ({

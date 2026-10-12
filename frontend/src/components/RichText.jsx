@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { formatTextNode } from "../lib/punct.js";
 
-function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceLang = "ru", targetLang = "es", onWordClick, onWordLongPress }) {
+function WordSpan({ id, word, info, translated, isLoading, content, wordLang, lang, sourceLang = "ru", targetLang = "es", onWordClick, onWordLongPress }) {
   const timerRef = useRef(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const isLongPressRef = useRef(false);
@@ -78,10 +78,15 @@ function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceL
     }
   };
 
+  const letters = Array.from(content);
+  const totalLetters = letters.length;
+  const stepDuration = 0.15;
+  const animDuration = Math.max(0.8, totalLetters * stepDuration);
+
   return (
     <span
       lang={wordLang}
-      className={`word ${translated ? "word--translated" : ""}`}
+      className={`word ${translated ? "word--translated" : ""} ${isLoading ? "word--loading" : ""}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -103,17 +108,34 @@ function WordSpan({ id, word, info, translated, content, wordLang, lang, sourceL
         }
       }}
       aria-label={
-        translated
+        isLoading
+          ? (targetLang === "es" ? `Cargando traducción de ${word}` : (targetLang === "en" ? `Loading translation for ${word}` : `Загрузка перевода для ${word}`))
+          : translated
           ? (targetLang === "es" ? `Restaurar palabra ${word}` : (targetLang === "en" ? `Restore word ${word}` : `Вернуть слово ${word}`))
           : (targetLang === "es" ? `Traducir palabra ${word}` : (targetLang === "en" ? `Translate word ${word}` : `Перевести слово ${word}`))
       }
     >
-      {content}
+      {isLoading ? (
+        letters.map((char, i) => (
+          <span
+            key={i}
+            className="word-letter"
+            style={{
+              animationDuration: `${animDuration}s`,
+              animationDelay: `${i * stepDuration}s`,
+            }}
+          >
+            {char}
+          </span>
+        ))
+      ) : (
+        content
+      )}
     </span>
   );
 }
 
-function Node({ node, index, translations, onWordClick, onWordLongPress, meta, lang, sourceLang, targetLang }) {
+function Node({ node, index, translations, loadingTokens = {}, onWordClick, onWordLongPress, meta, lang, sourceLang, targetLang }) {
   if (!node) return null;
   if (node.t === "text") return formatTextNode(node.s);
   if (node.t === "w") {
@@ -121,6 +143,7 @@ function Node({ node, index, translations, onWordClick, onWordLongPress, meta, l
     const word = node.s;
     const info = meta[id] || {};
     const translated = translations[id];
+    const isLoading = Boolean(loadingTokens[id]);
     const content = translated || word;
     const effSourceLang = sourceLang || (lang === "ru" ? "es" : lang);
     const effTargetLang = targetLang || (effSourceLang === "es" ? "ru" : (effSourceLang === "en" ? "ru" : "es"));
@@ -132,6 +155,7 @@ function Node({ node, index, translations, onWordClick, onWordLongPress, meta, l
         word={word}
         info={info}
         translated={translated}
+        isLoading={isLoading}
         content={content}
         wordLang={wordLang}
         lang={lang}
@@ -149,6 +173,7 @@ function Node({ node, index, translations, onWordClick, onWordLongPress, meta, l
       node={child}
       index={idx}
       translations={translations}
+      loadingTokens={loadingTokens}
       onWordClick={onWordClick}
       onWordLongPress={onWordLongPress}
       meta={meta}
@@ -167,6 +192,7 @@ function Node({ node, index, translations, onWordClick, onWordLongPress, meta, l
 export default function RichText({
   nodes = [],
   translations = {},
+  loadingTokens = {},
   onWordClick = () => {},
   onWordLongPress = () => {},
   meta = {},
@@ -180,6 +206,7 @@ export default function RichText({
       node={node}
       index={index}
       translations={translations}
+      loadingTokens={loadingTokens}
       onWordClick={onWordClick}
       onWordLongPress={onWordLongPress}
       meta={meta}
