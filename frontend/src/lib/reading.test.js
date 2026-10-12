@@ -285,3 +285,61 @@ test("formatTextNode converts space before dash to non-breaking space and glues 
   assert.equal(formatTextNode("слово , которое"), "слово, которое");
   assert.equal(formatTextNode(" ( « цитата » )"), " (\u00A0«\u00A0цитата»)");
 });
+
+test("12. Невозможность случайного показа перевода соседнего слова при клике по токену", () => {
+  const meta = {
+    "10": { w: "словоA", lemma: "словоA" },
+    "11": { w: "словоB", lemma: "словоB" },
+    "12": { w: "словоC", lemma: "словоC" },
+  };
+  const preparedTranslations = {
+    "10": "translationA",
+    "11": "translationB",
+    "12": "translationC",
+  };
+
+  const learnedWords = {
+    словоb: { lemma: "словоB", primaryTranslation: "translationB", translations: ["translationB"] },
+  };
+
+  const visible = applyLearnedTranslations({
+    meta,
+    preparedTranslations,
+    learnedWords,
+  });
+
+  assert.equal(visible["11"], "translationB");
+  assert.equal(visible["10"], undefined);
+  assert.equal(visible["12"], undefined);
+});
+
+test("13. Клики по словам используют подготовленный перевод из daily.translations без повторных запросов", () => {
+  globalThis.localStorage.clear();
+  const data = {
+    date: "2026-10-10",
+    meta: {
+      "0": { w: "мир", lemma: "мир", sent: "Да будет мир." },
+    },
+    translations: {
+      "0": "paz",
+    },
+    translations_status: "ready",
+  };
+
+  const key = "0";
+  const lemma = data.meta[key].lemma;
+  const preparedTranslation = data.translations[key];
+
+  assert.equal(preparedTranslation, "paz");
+
+  const updatedLearned = addLearnedWord(lemma, preparedTranslation);
+  assert.equal(updatedLearned["мир"].primaryTranslation, "paz");
+
+  const visible = applyLearnedTranslations({
+    meta: data.meta,
+    preparedTranslations: data.translations,
+    learnedWords: updatedLearned,
+  });
+
+  assert.equal(visible["0"], "paz");
+});

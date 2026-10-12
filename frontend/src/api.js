@@ -23,12 +23,6 @@ export const requestTranslations = (date, langMode = "ru") => {
   return j(`/api/daily/translations?${query}`, { method: "POST" });
 };
 
-export const translateWord = (payload) => j(`/api/translate`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(payload),
-});
-
 export const fetchTtsAudio = (payload) => j(`/api/tts`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },

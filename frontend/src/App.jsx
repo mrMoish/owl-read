@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { translateWord } from "./api.js";
 import {
   loadLearnedWords,
   addLearnedWord,
@@ -17,20 +16,6 @@ import { useDaily } from "./useDaily.js";
 import { transliterateBlock, transliterateRussianToLatin } from "./lib/transliteration.js";
 
 const BUILD_ID = "2026.10.10.v14";
-
-function flattenText(nodes) {
-  return nodes.map((n) => {
-    if (n.t === "text") return n.s;
-    if (n.c) return flattenText(n.c);
-    return "";
-  }).join("");
-}
-
-function articleContext(data) {
-  if (!data) return "";
-  const blocks = [data.verse, ...(data.comment || [])];
-  return blocks.map((block) => flattenText(block.nodes || [])).join(" ");
-}
 
 export default function App() {
   const { data, loading, error, notice, reload, mode } = useDaily();
@@ -87,7 +72,7 @@ export default function App() {
     return data.comment;
   }, [data?.comment, mode.transliterate, sourceLang, targetLang]);
 
-  const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
+  const handleWordClick = ({ id, word, sentence, lemma }) => {
     if (!data?.date || !sentence) {
       return;
     }
@@ -101,24 +86,7 @@ export default function App() {
       return;
     }
 
-    let translated = data?.translations?.[key];
-    if (!translated || translated === word) {
-      try {
-        const payload = {
-          word,
-          lemma: lemma || word,
-          sentence,
-          context: context || articleContext(data),
-          date: data.date,
-          lang: sourceLang,
-        };
-        const res = await translateWord(payload);
-        translated = res?.translation || res?.original || word;
-      } catch {
-        // Fallback
-      }
-    }
-
+    const translated = data?.translations?.[key];
     if (!translated || translated === word) {
       return;
     }

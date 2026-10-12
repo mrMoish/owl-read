@@ -62,3 +62,17 @@ class Store:
         with self._lock, self._db:
             self._db.executemany("INSERT OR REPLACE INTO translations VALUES(?,?,?)",
                                  [(k, v, time.time()) for k, v in items.items()])
+
+    def get_comment_translation(self, key: str) -> dict[int, str] | None:
+        res = self.get_translations([key])
+        if key in res:
+            try:
+                data = json.loads(res[key])
+                return {int(k): str(v) for k, v in data.items()}
+            except Exception:
+                return None
+        return None
+
+    def put_comment_translation(self, key: str, translations: dict[int, str]) -> None:
+        data_str = json.dumps({str(k): v for k, v in translations.items()}, ensure_ascii=False)
+        self.put_translations({key: data_str})

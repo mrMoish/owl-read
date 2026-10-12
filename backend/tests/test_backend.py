@@ -2,6 +2,7 @@ import asyncio, json, logging, zipfile
 from dataclasses import replace
 from datetime import date, datetime, timezone, timedelta
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.main import create_app
@@ -9,7 +10,7 @@ from app.textproc.analyzer import analyze_blocks, priority_order, format_text_no
 from app.store import Store
 from app.daily import DailyService
 from app.translation.service import TranslationService
-from app.translation.openrouter import OpenRouterClient, parse_response
+from app.translation.openrouter import OpenRouterClient, parse_response, TranslationError
 from app.epub import EpubBrochureManager, EpubError
 
 
@@ -62,11 +63,6 @@ class DummyEpubManager(EpubBrochureManager):
         pass
 
 
-def test_parse_response_validation():
-    txt = '```json\n{"translations":[{"id":1,"es":"amor"},{"id":2,"es":"любовь"},{"id":9,"es":"x"}]}\n```'
-    assert parse_response(txt, {1, 2}) == {1: "amor"}
-
-
 def make_app(tmp_path, key="k", epub_mgr=None):
     s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key=key)
     mgr = epub_mgr or DummyEpubManager()
@@ -74,54 +70,303 @@ def make_app(tmp_path, key="k", epub_mgr=None):
     return app
 
 
+def test_parse_response_validation():
+    expected_items = {1: "amor", 2: "любовь"}
+    txt = '```json\n{"translations":[{"id":1,"word":"amor","es":"love"},{"id":2,"word":"любовь","es":"amor"},{"id":9,"es":"x"}]}\n```'
+    assert parse_response(txt, expected_items) == {1: "love", 2: "amor"}
+
+
+def test_strict_id_and_source_word_validation():
+    expected_items = {
+        0: "Христианам",
+        1: "в",
+        2: "Иудее",
+    }
+    # Response includes:
+    # id 0: valid
+    # id 1: mismatched source word ("на")
+    # id 2: valid
+    # id 999: non-existent ID
+    txt = json.dumps({
+        "translations": [
+            {"id": 0, "word": "Христианам", "es": "A los cristianos"},
+            {"id": 1, "word": "на", "es": "en"},
+            {"id": 2, "word": "Иудее", "es": "Judea"},
+            {"id": 999, "word": "неизвестно", "es": "desconocido"},
+        ]
+    })
+    res = parse_response(txt, expected_items, lang="ru")
+    assert 0 in res and res[0] == "A los cristianos"
+    assert 1 not in res  # Rejected due to source word mismatch ("на" != "в")
+    assert 2 in res and res[2] == "Judea"
+    assert 999 not in res  # Rejected due to unknown ID
+
+
 def test_daily_cache_new_day_and_stale(tmp_path):
     app = make_app(tmp_path, key="")
     c = TestClient(app)
     today = datetime.now(timezone.utc).date()
-    d1, d2 = today.isoformat(), (today + timedelta(days=1)).isoformat()
+    d1 = today.isoformat()
     a = c.get(f"/api/daily?date={d1}").json()
     assert a["date"] == d1
     assert a["translations_status"] == "unavailable"
 
 
-def test_translations_cached(tmp_path):
-    n = {"llm": 0}
+def test_full_comment_single_request_and_caching(tmp_path):
+    calls = []
+
     def handler(request):
-        n["llm"] += 1
-        items = json.loads(json.loads(request.content)["messages"][1]["content"])["items"]
-        rows = [{"id": i["id"], "es": "amor" if i["word"] == "любовь" else "palabra"} for i in items]
+        calls.append(request)
+        body = json.loads(request.content)
+        user_msg = json.loads(body["messages"][1]["content"])
+        # Verify single request contains full_text and all items
+        assert "full_text" in user_msg
+        assert "items" in user_msg
+        items = user_msg["items"]
+        assert len(items) > 5  # Ensure all tokens sent together, not split into 40-word batches
+        rows = [{"id": i["id"], "word": i["word"], "es": f"tr_{i['id']}"} for i in items]
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
 
     import app.translation.openrouter as o
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     orig = o.OpenRouterClient.__init__
-    def init(self, k, m, h=None): orig(self, k, m, http)
+
+    def init(self, k, m, h=None):
+        orig(self, k, m, http)
+
     o.OpenRouterClient.__init__ = init
     try:
         app = make_app(tmp_path)
         c = TestClient(app)
         d = datetime.now(timezone.utc).date().isoformat()
-        r = c.post(f"/api/daily/translations?date={d}").json()
-        assert r["translations_status"] == "ready" and "amor" in r["translations"].values() and n["llm"] >= 1
-        before = n["llm"]
-        c.post(f"/api/daily/translations?date={d}")
-        assert n["llm"] == before                                     # кэш: повторных запросов нет
+
+        # First load / translation request
+        r1 = c.post(f"/api/daily/translations?date={d}").json()
+        assert r1["translations_status"] == "ready"
+        assert len(calls) == 1  # Exactly ONE AI request for the entire comment
+
+        # Second call reuses cached full comment translation without new AI requests
+        r2 = c.post(f"/api/daily/translations?date={d}").json()
+        assert r2["translations_status"] == "ready"
+        assert len(calls) == 1
+
         g = c.get(f"/api/daily?date={d}").json()
         assert g["translations_status"] == "ready"
+        assert len(g["translations"]) == len(r1["translations"])
     finally:
         o.OpenRouterClient.__init__ = orig
 
 
-def test_missing_translation_preserves_original_word(tmp_path):
-    """Слово без перевода должно возвращать исходное русское слово без ошибок."""
-    app = make_app(tmp_path)
-    c = TestClient(app)
-    r = c.post("/api/translate", json={
-        "word": "неизвестное",
-        "sentence": "Это неизвестное слово.",
-        "date": "2026-10-06"
-    }).json()
-    assert r["translation"] == "неизвестное"
+def test_changed_comment_invalidates_cache(tmp_path):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        body = json.loads(request.content)
+        user_msg = json.loads(body["messages"][1]["content"])
+        items = user_msg["items"]
+        rows = [{"id": i["id"], "word": i["word"], "es": f"tr_{i['id']}"} for i in items]
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
+
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    orig = o.OpenRouterClient.__init__
+
+    def init(self, k, m, h=None):
+        orig(self, k, m, http)
+
+    o.OpenRouterClient.__init__ = init
+
+    try:
+        mgr = DummyEpubManager()
+        app = make_app(tmp_path, epub_mgr=mgr)
+        c = TestClient(app)
+        d = date(2026, 10, 6).isoformat()
+
+        # 1. First translation
+        r1 = c.post(f"/api/daily/translations?date={d}").json()
+        assert r1["translations_status"] == "ready"
+        assert len(calls) == 1
+
+        # 2. Update daily content store directly with different text for the same date
+        store = Store(tmp_path / "t.db")
+        new_parsed = {
+            "date": d,
+            "date_label": "6 октября",
+            "title": "Новый заголовок",
+            "verse": "Новый стих",
+            "comment": ["Совершенно другой уникальный комментарий дня."],
+        }
+        new_content = DailyService.build(new_parsed, d, lang="ru")
+        store.put_daily(d, new_content, lang="ru")
+
+        # 3. Request translation again -> comment changed -> cache invalidated
+        r2 = c.post(f"/api/daily/translations?date={d}").json()
+        assert r2["translations_status"] == "ready"
+        assert len(calls) == 2
+    finally:
+        o.OpenRouterClient.__init__ = orig
+
+
+def test_language_pair_cache_isolation(tmp_path):
+    requests_by_lang = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        user_msg = json.loads(body["messages"][1]["content"])
+        items = user_msg["items"]
+        sys_msg = body["messages"][0]["content"]
+
+        if "Argentine Spanish" in sys_msg:
+            requests_by_lang.append("ru-es")
+            rows = [{"id": i["id"], "word": i["word"], "es": f"es_{i['id']}"} for i in items]
+        else:
+            requests_by_lang.append("es-ru")
+            rows = [{"id": i["id"], "word": i["word"], "ru": f"слово_{i['id']}"} for i in items]
+
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
+
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    orig = o.OpenRouterClient.__init__
+
+    def init(self, k, m, h=None):
+        orig(self, k, m, http)
+
+    o.OpenRouterClient.__init__ = init
+
+    try:
+        app = make_app(tmp_path)
+        c = TestClient(app)
+        d = date(2026, 10, 6).isoformat()
+
+        # Request in Russian mode (ru -> es)
+        r_ru = c.post(f"/api/daily/translations?date={d}&lang=ru").json()
+        assert r_ru["translations_status"] == "ready"
+        assert any(v.startswith("es_") for v in r_ru["translations"].values())
+
+        # Request in Spanish mode (es -> ru)
+        r_es = c.post(f"/api/daily/translations?date={d}&lang=es").json()
+        assert r_es["translations_status"] == "ready"
+        assert any(v.startswith("слово_") for v in r_es["translations"].values())
+
+        assert requests_by_lang == ["ru-es", "es-ru"]
+    finally:
+        o.OpenRouterClient.__init__ = orig
+
+
+def test_repeated_words_and_context_dependent_translations(tmp_path):
+    def handler(request):
+        body = json.loads(request.content)
+        user_msg = json.loads(body["messages"][1]["content"])
+        items = user_msg["items"]
+        rows = []
+        for i in items:
+            if i["word"] in ("Бог", "Бога"):
+                tr = "Dios" if i["id"] < 18 else "Señor"
+            else:
+                tr = f"tr_{i['id']}"
+            rows.append({"id": i["id"], "word": i["word"], "es": tr})
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
+
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    orig = o.OpenRouterClient.__init__
+
+    def init(self, k, m, h=None):
+        orig(self, k, m, http)
+
+    o.OpenRouterClient.__init__ = init
+
+    try:
+        app = make_app(tmp_path)
+        c = TestClient(app)
+        d = date(2026, 10, 6).isoformat()
+
+        r = c.post(f"/api/daily/translations?date={d}").json()
+        tr = r["translations"]
+
+        bog_ids = sorted([int(k) for k, v in c.get(f"/api/daily?date={d}").json()["meta"].items() if v["lemma"] == "бог"])
+        assert len(bog_ids) >= 2
+        # Ensure each token ID receives its distinct context translation
+        assert tr[str(bog_ids[0])] == "Dios"
+        assert tr[str(bog_ids[1])] == "Señor"
+    finally:
+        o.OpenRouterClient.__init__ = orig
+
+
+def test_translation_failure_recovery(tmp_path):
+    attempts = {"count": 0}
+
+    def handler(request):
+        attempts["count"] += 1
+        if attempts["count"] <= 3:
+            return httpx.Response(500, text="Internal OpenRouter Server Error")
+
+        body = json.loads(request.content)
+        user_msg = json.loads(body["messages"][1]["content"])
+        items = user_msg["items"]
+        rows = [{"id": i["id"], "word": i["word"], "es": f"tr_{i['id']}"} for i in items]
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
+
+    import app.translation.openrouter as o
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    orig = o.OpenRouterClient.__init__
+
+    def init(self, k, m, h=None):
+        orig(self, k, m, http)
+
+    o.OpenRouterClient.__init__ = init
+
+    try:
+        app = make_app(tmp_path)
+        c = TestClient(app)
+        d = date(2026, 10, 6).isoformat()
+
+        # 1. First attempt fails all retries -> status "failed", no bad cache stored
+        r1 = c.post(f"/api/daily/translations?date={d}").json()
+        assert r1["translations_status"] == "failed"
+        assert r1["translations"] == {}
+
+        # Check DB cache is empty for this date
+        cached_g1 = c.get(f"/api/daily?date={d}").json()
+        assert cached_g1["translations"] == {}
+
+        # 2. Second attempt succeeds -> recovers cleanly and stores cache
+        r2 = c.post(f"/api/daily/translations?date={d}").json()
+        assert r2["translations_status"] == "ready"
+        assert len(r2["translations"]) > 0
+
+        cached_g2 = c.get(f"/api/daily?date={d}").json()
+        assert cached_g2["translations_status"] == "ready"
+    finally:
+        o.OpenRouterClient.__init__ = orig
+
+
+def test_neighboring_word_regression_prevention():
+    """Проверяет, что переводы назначаются исключительно по точным ID токенов и совпадению исходных слов, исключая сдвиг на соседнее слово."""
+    expected_items = {
+        10: "словоA",
+        11: "словоB",
+        12: "словоC",
+    }
+
+    scrambled_ai_response = json.dumps({
+        "translations": [
+            {"id": 12, "word": "словоC", "es": "translationC"},
+            {"id": 10, "word": "словоA", "es": "translationA"},
+            {"id": 11, "word": "словоB", "es": "translationB"},
+        ]
+    })
+
+    res = parse_response(scrambled_ai_response, expected_items)
+
+    assert res[10] == "translationA"
+    assert res[11] == "translationB"
+    assert res[12] == "translationC"
+
+    assert res[11] != "translationA"
+    assert res[11] != "translationC"
 
 
 def test_spanish_mode_support(tmp_path):
@@ -146,6 +391,7 @@ def test_format_text_node_and_analyzer_punctuation_binding():
 
 def test_tts_endpoint(tmp_path):
     captured = {}
+
     def handler(request):
         captured["url"] = str(request.url)
         captured["body"] = json.loads(request.content)
@@ -155,7 +401,10 @@ def test_tts_endpoint(tmp_path):
     import app.translation.openrouter as o
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     orig = o.OpenRouterClient.__init__
-    def init(self, k, m, h=None): orig(self, k, m, http)
+
+    def init(self, k, m, h=None):
+        orig(self, k, m, http)
+
     o.OpenRouterClient.__init__ = init
     try:
         s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="key")
@@ -176,6 +425,7 @@ def test_tts_endpoint(tmp_path):
 
 def test_pronunciation_endpoint(tmp_path):
     captured_messages = []
+
     def handler(request):
         payload = json.loads(request.content)
         captured_messages.append(payload["messages"])
@@ -186,7 +436,10 @@ def test_pronunciation_endpoint(tmp_path):
     import app.translation.openrouter as o
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     orig = o.OpenRouterClient.__init__
-    def init(self, k, m, h=None): orig(self, k, m, http)
+
+    def init(self, k, m, h=None):
+        orig(self, k, m, http)
+
     o.OpenRouterClient.__init__ = init
     try:
         s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="key")

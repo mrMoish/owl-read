@@ -5,7 +5,6 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from .config import Settings, get_settings
 from .daily import DailyService
@@ -15,7 +14,6 @@ from .translation.service import TranslationService
 from .epub import EpubBrochureManager, EpubError
 
 log = logging.getLogger("reader")
-
 
 
 def _resolve_lang(lang_param: str | None, en_param: str | None) -> str:
@@ -31,7 +29,7 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
     store = Store(s.db_path)
     client = OpenRouterClient(s.openrouter_api_key, s.openrouter_model) if s.openrouter_api_key else None
     if not client:
-        log.warning("OPENROUTER_API_KEY не задан: перевод отключён, текст останется на русском")
+        log.warning("OPENROUTER_API_KEY не задан: перевод отключён")
     tr = TranslationService(store, client, s.translate_max_share)
     epub_mgr = epub_manager or EpubBrochureManager()
     daily = DailyService(s, store, tr, epub_manager=epub_mgr)
@@ -41,7 +39,7 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
         for o in __import__("os").environ.get("ALLOWED_ORIGINS", "").split(",")
         if o.strip()
     ]
-    
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -150,59 +148,6 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
                  content["date"], active_lang, len(translations), status, elapsed)
         return {"date": content["date"], "translations": {str(k): v for k, v in translations.items()},
                 "translations_status": status}
-
-    @app.post("/api/translate")
-    async def translate_word(response: Response, payload: dict):
-        response.headers["Cache-Control"] = "no-store"
-        word = str(payload.get("word", "")).strip()
-        lemma = str(payload.get("lemma", word or "")).strip()
-        sentence = str(payload.get("sentence", "")).strip()
-        context = str(payload.get("context", sentence)).strip()
-        date = str(payload.get("date") or "").strip()
-        lang = str(payload.get("lang") or "").strip()
-
-        log.info("[API Translate] POST /api/translate: word='%s' lemma='%s' date=%s lang=%s",
-                 word, lemma, date, lang)
-
-        if not word or not sentence:
-            raise HTTPException(400, "word и sentence обязательны")
-        if lang == "en" or payload.get("en") is not None:
-            active_lang = "en"
-        elif lang == "es":
-            active_lang = "es"
-        else:
-            active_lang = "ru"
-
-        try:
-            if active_lang == "en":
-                content, _ = await daily.get_english(date or None)
-            elif active_lang == "es":
-                content, _ = await daily.get_spanish(date or None)
-            else:
-                content, _ = await daily.get(date or None)
-        except EpubError as e:
-            raise HTTPException(503, f"Материал недоступен: {e}")
-
-        ref_text = ""
-        try:
-            if active_lang in ("en", "es"):
-                ref_content, _ = await daily.get(date or None)
-            else:
-                ref_content, _ = await daily.get_spanish(date or None)
-            ref_text = _flatten_daily_text(ref_content)
-        except EpubError:
-            ref_text = ""
-
-        translated = await tr.translate_word(
-            date=date or content["date"],
-            word=word,
-            lemma=lemma,
-            sentence=sentence,
-            context=context,
-            spanish_reference=ref_text,
-            lang=active_lang,
-        )
-        return {"original": word, "translation": translated}
 
     @app.post("/api/tts")
     async def get_tts(response: Response, payload: dict):
