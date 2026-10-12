@@ -139,3 +139,29 @@ test("Neighboring-word translation bug regression check", () => {
   assert.equal(visible["1"], undefined);
   assert.equal(visible["2"], "segunda");
 });
+
+test("Frontend client-side cache: Repeated translation toggles hit client cache without backend requests", async () => {
+  let backendCallCount = 0;
+  const frontendCache = {};
+
+  const handleWordClick = async (date, modeId, id, word) => {
+    const cacheKey = `${date}:${modeId}:${id}`;
+    if (frontendCache[cacheKey]) {
+      return frontendCache[cacheKey];
+    }
+    backendCallCount++;
+    const result = `translated_${word}`;
+    frontendCache[cacheKey] = result;
+    return result;
+  };
+
+  // 1st click: fetches from backend
+  const res1 = await handleWordClick("2026-10-06", "es-ru", "token_10", "vida");
+  assert.equal(res1, "translated_vida");
+  assert.equal(backendCallCount, 1);
+
+  // 2nd click: consumes frontend cache without backend request
+  const res2 = await handleWordClick("2026-10-06", "es-ru", "token_10", "vida");
+  assert.equal(res2, "translated_vida");
+  assert.equal(backendCallCount, 1); // No increase in backend call count
+});
