@@ -1,4 +1,4 @@
-# Чтение на каждый день (PWA).
+# Чтение на каждый день (PWA)
 
 React + Service Worker + Web App Manifest · FastAPI · OpenRouter.
 
