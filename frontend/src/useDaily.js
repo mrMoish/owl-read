@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDaily, requestTranslations, syncBrochure } from "./api.js";
 import { loadDaily, localDate, saveDaily } from "./lib/storage.js";
 import { initialData, offlineState } from "./lib/offline.js";
-import { activeMode, getModeByPath } from "./lib/modes.js";
+import { activeMode } from "./lib/modes.js";
 
 function activeDate() {
   if (typeof window !== "undefined" && window.location?.search) {
@@ -65,6 +65,15 @@ export function useDaily() {
     } finally { busy.current = false; }
   }, []);
 
+  const updateDailyData = useCallback((updater) => {
+    setState((s) => {
+      if (!s.data) return s;
+      const nextData = typeof updater === "function" ? updater(s.data) : updater;
+      saveDaily(nextData, s.langMode);
+      return { ...s, data: nextData };
+    });
+  }, []);
+
   useEffect(() => {
     load();
     let day = activeDate();
@@ -73,5 +82,5 @@ export function useDaily() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [load]);
 
-  return { ...state, reload: load };
+  return { ...state, reload: load, updateDailyData };
 }

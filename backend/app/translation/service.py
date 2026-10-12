@@ -1,4 +1,4 @@
-"""Перевод полного комментария дня и кэширование единым блоком."""
+"""Перевод полного комментария дня и кэширование единым блоком, а также перевод отдельных слов по запросу."""
 from __future__ import annotations
 import hashlib
 import json
@@ -7,6 +7,19 @@ from .openrouter import OpenRouterClient, TranslationError
 
 log = logging.getLogger("uvicorn.error")
 SCHEMA_VERSION = "v3"
+LANG = "es-AR"
+
+
+def cache_key(*parts, lang: str = "ru"):
+    """Составной cache key: date + word + sentence + language."""
+    if len(parts) == 2:
+        word, sentence = parts
+        date = ""
+    else:
+        date, word, sentence = parts
+    lang_tag = "ru-EN" if lang == "en" else ("es-RU" if lang == "es" else LANG)
+    text = f"v2|{date}|{lang_tag}|{word.lower()}|{sentence}"
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()
 
 
 def compute_content_hash(content: dict) -> str:
@@ -96,11 +109,37 @@ class TranslationService:
             log.warning("Full comment translation failed: %s", e)
             return {}, "failed"
 
-        if not isinstance(new_tr, dict):
+        if not new_tr or not isinstance(new_tr, dict):
             return {}, "failed"
 
         self.store.put_comment_translation(key, new_tr)
         return new_tr, "ready"
+
+    async def translate_word(self, *, date: str, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None, lang: str = "ru"):
+        if not word or not sentence:
+            return word
+        ckey = cache_key(date, word, sentence, lang=lang)
+        previous = self.store.get_translations([ckey])
+        if ckey in previous:
+            return previous[ckey]
+        if not self.client:
+            return word
+        try:
+            tr = await self.client.translate_word(
+                word=word,
+                lemma=lemma,
+                sentence=sentence,
+                context=context,
+                spanish_reference=spanish_reference,
+                lang=lang,
+            )
+        except TranslationError as e:
+            log.warning("translate_word failed: %s", e)
+            return word
+        if not tr or tr == word or tr == lemma:
+            return word
+        self.store.put_translations({ckey: tr})
+        return tr
 
     async def generate_tts(self, *, word: str, sentence: str = "", lang: str = "es"):
         if not word or not self.client:

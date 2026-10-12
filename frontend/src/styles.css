@@ -67,6 +67,35 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   /* No visual change. Same as untranslated. */
 }
 
+/* On-demand loading animation state for interactive word */
+.word--loading {
+  color: var(--muted);
+  cursor: wait;
+}
+
+.word--loading .word-char {
+  display: inline;
+  color: var(--muted);
+  animation: letterPulse 1.2s ease-in-out infinite;
+  animation-delay: calc(var(--char-index) * (1.2s / var(--char-total)));
+}
+
+@keyframes letterPulse {
+  0%, 100% {
+    color: var(--muted);
+  }
+  25%, 40% {
+    color: var(--ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word--loading .word-char {
+    animation: none !important;
+    color: var(--muted) !important;
+  }
+}
+
 .es { color: var(--accent); font-weight: 600; font-style: normal; }
 .source { margin-top: 2rem; color: var(--muted); font-size: 0.9rem; }
 .notice { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }

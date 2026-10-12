@@ -53,6 +53,37 @@ SYSTEM_EN_RU_COMMENT = (
     'Answer with JSON only: {"translations":[{"id":<int>,"word":"<source_word>","ru":"<text>"}]}'
 )
 
+SINGLE_SYSTEM_RU_ES = (
+    "You translate selected Russian words or phrases in sentence context into Argentine Spanish (es-AR) "
+    "for an interactive reading application. The target translation will replace the selected Russian text in place.\n"
+    "Follow these rules strictly:\n"
+    "1. Multi-word translations: If a Russian word naturally translates into a multi-word phrase in Spanish, return the full, complete phrase (up to 3-4 words). Do not drop essential words.\n"
+    "2. Grammatical and contextual fit: Match the exact syntactic role, tense, person, number, and gender in sentence context.\n"
+    "3. Selected text only: Translate only the selected target word or phrase, using the sentence and Spanish WOL context. Do not translate unselected neighboring words.\n"
+    "4. Formatting: Keep the first letter capitalized if the source word/phrase is capitalized.\n"
+    "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.8-1.0}."
+)
+SINGLE_SYSTEM_ES_RU = (
+    "You translate selected Spanish words or phrases in sentence context into Russian for an interactive reading application. "
+    "The target translation will replace the selected Spanish text in place.\n"
+    "Follow these rules strictly:\n"
+    "1. Multi-word translations: If a Spanish word or verb naturally translates into a multi-word phrase in Russian (e.g. 'maltraten' -> 'плохо обращаются', 'desagrada' -> 'не нравится'), return the full, complete multi-word phrase (up to 3-4 words). Do not drop essential verbs or truncate into an incomplete single word like 'плохо'.\n"
+    "2. Grammatical and contextual fit: Match the exact syntactic role and meaning in sentence context (tense, person, number, case, manner).\n"
+    "3. Selected text only: Translate only the selected target word or phrase, using the sentence and Russian WOL reference for context. Do not translate unselected neighboring words.\n"
+    "4. Formatting: Keep the first letter capitalized if the source word/phrase is capitalized.\n"
+    "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.8-1.0}."
+)
+SINGLE_SYSTEM_EN_RU = (
+    "You translate selected English words or phrases in sentence context into Russian for an interactive reading application. "
+    "The target translation will replace the selected English text in place.\n"
+    "Follow these rules strictly:\n"
+    "1. Multi-word translations: If an English word or verb naturally translates into a multi-word phrase in Russian, return the full, complete multi-word phrase (up to 3-4 words). Do not drop essential verbs or truncate into an incomplete single word.\n"
+    "2. Grammatical and contextual fit: Match the exact syntactic role and meaning in sentence context (tense, person, number, case, manner).\n"
+    "3. Selected text only: Translate only the selected target word or phrase, using the sentence and Russian WOL reference for context. Do not translate unselected neighboring words.\n"
+    "4. Formatting: Keep the first letter capitalized if the source word/phrase is capitalized.\n"
+    "Return JSON only: {\"translation\": \"<text>\", \"confidence\": 0.8-1.0}."
+)
+
 SYSTEM_PRONUNCIATION = (
     "You are a linguistic expert and phonetician. "
     "For the given target word in its sentence context, generate: "
@@ -117,6 +148,25 @@ def parse_response(
                 out[i] = val
 
     return out
+
+
+def parse_single_response(text: str, lang: str = "ru") -> str:
+    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+    try:
+        data = json.loads(text)
+        tr = data.get("translation") if isinstance(data, dict) else None
+        if tr is None and isinstance(data, dict):
+            tr = data.get("ru") or data.get("es")
+        if not isinstance(tr, str):
+            raise TranslationError("translation field missing")
+        tr = tr.strip()
+        if not tr or len(tr) > 60:
+            raise TranslationError("translation invalid")
+        if lang not in ("en", "es") and CYR.search(tr):
+            raise TranslationError("translation invalid")
+        return tr
+    except (ValueError, TypeError, KeyError) as e:
+        raise TranslationError(f"Некорректный JSON от модели: {e}") from e
 
 
 def parse_pronunciation_response(text: str) -> dict[str, str]:
@@ -200,6 +250,55 @@ class OpenRouterClient:
             if own:
                 await http.aclose()
 
+    async def translate_word(self, *, word: str, lemma: str, sentence: str, context: str, spanish_reference: str | None = None, lang: str = "ru") -> str:
+        """Перевод одного слова в контексте."""
+        payload = {
+            "word": word,
+            "lemma": lemma,
+            "sentence": sentence,
+            "context": context,
+            "spanish_reference": spanish_reference or "",
+        }
+        system_prompt = SINGLE_SYSTEM_EN_RU if lang == "en" else (SINGLE_SYSTEM_ES_RU if lang == "es" else SINGLE_SYSTEM_RU_ES)
+        body = {
+            "model": self.model,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "X-Title": "Daily Reader"}
+        own = self._http is None
+        http = self._http or httpx.AsyncClient(timeout=60)
+        last: Exception | None = None
+        try:
+            for attempt in range(3):
+                try:
+                    r = await http.post(URL, json=body, headers=headers)
+                    if r.status_code == 400 and "response_format" in body:
+                        body.pop("response_format")
+                        log.warning("400 от OpenRouter, повторяю без response_format")
+                        continue
+                    if r.status_code in (401, 402, 403):
+                        raise TranslationError(f"OpenRouter {r.status_code}: {r.text[:200]}")
+                    if r.status_code in (429, 500, 502, 503, 504):
+                        raise TranslationError(f"OpenRouter {r.status_code}")
+                    r.raise_for_status()
+                    content = r.json()["choices"][0]["message"]["content"]
+                    return parse_single_response(content, lang=lang)
+                except (httpx.HTTPError, TranslationError, KeyError, IndexError, ValueError) as e:
+                    last = e
+                    log.warning("OpenRouter single-word попытка %s не удалась: %s", attempt + 1, e)
+                    if isinstance(e, TranslationError) and "OpenRouter 40" in str(e):
+                        break
+                    await asyncio.sleep(0.8 * (attempt + 1))
+        finally:
+            if own:
+                await http.aclose()
+        raise TranslationError(f"OpenRouter недоступен: {last}")
+
     async def translate_full_comment(
         self,
         *,
@@ -260,4 +359,4 @@ class OpenRouterClient:
         finally:
             if own:
                 await http.aclose()
-        raise TranslationError(f"OpenRouter unavailable: {last}")
+        raise TranslationError(f"OpenRouter недоступен: {last}")

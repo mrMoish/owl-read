@@ -82,11 +82,6 @@ def test_strict_id_and_source_word_validation():
         1: "в",
         2: "Иудее",
     }
-    # Response includes:
-    # id 0: valid
-    # id 1: mismatched source word ("на")
-    # id 2: valid
-    # id 999: non-existent ID
     txt = json.dumps({
         "translations": [
             {"id": 0, "word": "Христианам", "es": "A los cristianos"},
@@ -119,11 +114,10 @@ def test_full_comment_single_request_and_caching(tmp_path):
         calls.append(request)
         body = json.loads(request.content)
         user_msg = json.loads(body["messages"][1]["content"])
-        # Verify single request contains full_text and all items
         assert "full_text" in user_msg
         assert "items" in user_msg
         items = user_msg["items"]
-        assert len(items) > 5  # Ensure all tokens sent together, not split into 40-word batches
+        assert len(items) > 5  # Ensure all tokens sent together
         rows = [{"id": i["id"], "word": i["word"], "es": f"tr_{i['id']}"} for i in items]
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"translations": rows})}}]})
 
@@ -288,7 +282,6 @@ def test_repeated_words_and_context_dependent_translations(tmp_path):
 
         bog_ids = sorted([int(k) for k, v in c.get(f"/api/daily?date={d}").json()["meta"].items() if v["lemma"] == "бог"])
         assert len(bog_ids) >= 2
-        # Ensure each token ID receives its distinct context translation
         assert tr[str(bog_ids[0])] == "Dios"
         assert tr[str(bog_ids[1])] == "Señor"
     finally:
