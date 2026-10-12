@@ -137,17 +137,8 @@ export default function App() {
   };
 
   const isRootPath = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
-  const isForceSelect = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("select");
 
-  useEffect(() => {
-    if (isRootPath && !isForceSelect) {
-      if (mode && mode.path && mode.path !== "/") {
-        window.location.replace(mode.path);
-      }
-    }
-  }, [isRootPath, isForceSelect, mode]);
-
-  if (isRootPath && (isForceSelect || !mode || mode.path === "/")) {
+  if (isRootPath) {
     return <ModeSelector />;
   }
 
