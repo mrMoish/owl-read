@@ -67,6 +67,42 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   /* No visual change. Same as untranslated. */
 }
 
+/* Loading state for on-demand word translation */
+.word--loading {
+  color: var(--muted);
+  cursor: wait;
+}
+
+.word-letter {
+  display: inline;
+  color: var(--muted);
+  animation-name: letterHighlight;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes letterHighlight {
+  0% {
+    color: var(--muted);
+  }
+  15% {
+    color: var(--ink);
+  }
+  30% {
+    color: var(--muted);
+  }
+  100% {
+    color: var(--muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-letter {
+    animation: none !important;
+    color: var(--muted) !important;
+  }
+}
+
 .es { color: var(--accent); font-weight: 600; font-style: normal; }
 .source { margin-top: 2rem; color: var(--muted); font-size: 0.9rem; }
 .notice { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }

@@ -81,7 +81,7 @@ def test_daily_cache_new_day_and_stale(tmp_path):
     d1, d2 = today.isoformat(), (today + timedelta(days=1)).isoformat()
     a = c.get(f"/api/daily?date={d1}").json()
     assert a["date"] == d1
-    assert a["translations_status"] == "unavailable"
+    assert a["translations_status"] == "ondemand"
 
 
 def test_translations_cached(tmp_path):
@@ -107,7 +107,7 @@ def test_translations_cached(tmp_path):
         c.post(f"/api/daily/translations?date={d}")
         assert n["llm"] == before                                     # кэш: повторных запросов нет
         g = c.get(f"/api/daily?date={d}").json()
-        assert g["translations_status"] == "ready"
+        assert g["translations_status"] == "ondemand"
     finally:
         o.OpenRouterClient.__init__ = orig
 
