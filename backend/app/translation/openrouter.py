@@ -20,6 +20,7 @@ SYSTEM_RU_ES = (
     "- Contextual grammar: Match the exact syntactic function in sentence context.\n"
     "- Capitalization: Keep the first letter capitalized if the source item is capitalized.\n"
     "- Style: Use natural Argentine Spanish (es-AR), neutral, no 'vosotros'. Use the provided sentence and Spanish WOL context.\n"
+    "- ID PRESERVATION & COMPLETENESS: You MUST return a translation object for EVERY item in the input 'items' array. The 'id' in each translation object MUST EXACTLY match the input item's 'id'. DO NOT skip any item, DO NOT re-number or re-index 'id' values (e.g. if an item has id 85, its output object must have id 85).\n"
     'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
 )
 SYSTEM_EN_RU = (
@@ -31,7 +32,8 @@ SYSTEM_EN_RU = (
     "- Contextual grammar: Match the exact syntactic function in sentence context.\n"
     "- Capitalization: Keep the first letter capitalized if the source item is capitalized.\n"
     "- JW Reference: Use the English sentence and Russian WOL reference context to choose natural terminology.\n"
-    'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
+    "- ID PRESERVATION & COMPLETENESS: You MUST return a translation object for EVERY item in the input 'items' array. The 'id' in each translation object MUST EXACTLY match the input item's 'id'. DO NOT skip any item, DO NOT re-number or re-index 'id' values (e.g. if an item has id 85, its output object must have id 85).\n"
+    'Answer with JSON only: {"translations":[{"id":<int>,"ru":"<text>"}]}'
 )
 SYSTEM_ES_RU = (
     "You translate Spanish words or short phrases, as used in a given Spanish sentence, into Russian "
@@ -42,7 +44,8 @@ SYSTEM_ES_RU = (
     "- Contextual grammar: Match the exact syntactic function in context (e.g. in 'de manera dura y desconsiderada', translate 'desconsiderada' as 'неуважительно').\n"
     "- Capitalization: Keep the first letter capitalized if the source item is capitalized.\n"
     "- JW Reference: Use the Spanish sentence and Russian WOL reference context to choose natural terminology.\n"
-    'Answer with JSON only: {"translations":[{"id":<int>,"es":"<text>"}]}'
+    "- ID PRESERVATION & COMPLETENESS: You MUST return a translation object for EVERY item in the input 'items' array. The 'id' in each translation object MUST EXACTLY match the input item's 'id'. DO NOT skip any item, DO NOT re-number or re-index 'id' values (e.g. if an item has id 85, its output object must have id 85).\n"
+    'Answer with JSON only: {"translations":[{"id":<int>,"ru":"<text>"}]}'
 )
 SINGLE_SYSTEM_RU_ES = (
     "You translate selected Russian words or phrases in sentence context into Argentine Spanish (es-AR) "
@@ -106,14 +109,19 @@ def parse_response(text: str, allowed_ids: set[int], lang: str = "ru") -> dict[i
     for r in rows if isinstance(rows, list) else []:
         try:
             i = int(r["id"])
-            val = str(r.get("es") if r.get("es") is not None else (r.get("ru") if r.get("ru") is not None else r.get("translation", ""))).strip()
+            if lang in ("en", "es"):
+                val = str(r.get("ru") if r.get("ru") is not None else (r.get("translation") if r.get("translation") is not None else r.get("es", ""))).strip()
+            else:
+                val = str(r.get("es") if r.get("es") is not None else (r.get("translation") if r.get("translation") is not None else r.get("ru", ""))).strip()
         except (KeyError, TypeError, ValueError):
             continue
         if i in allowed_ids and val and len(val) <= 60:
             if lang in ("en", "es"):
-                out[i] = val
-            elif not CYR.search(val):
-                out[i] = val
+                if CYR.search(val):
+                    out[i] = val
+            else:
+                if not CYR.search(val):
+                    out[i] = val
     return out
 
 
@@ -121,16 +129,23 @@ def parse_single_response(text: str, lang: str = "ru") -> str:
     text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
     try:
         data = json.loads(text)
-        tr = data.get("translation") if isinstance(data, dict) else None
-        if tr is None and isinstance(data, dict):
-            tr = data.get("ru") or data.get("es")
+        if not isinstance(data, dict):
+            raise TranslationError("JSON object expected")
+        if lang in ("en", "es"):
+            tr = data.get("ru") if data.get("ru") is not None else (data.get("translation") if data.get("translation") is not None else data.get("es"))
+        else:
+            tr = data.get("es") if data.get("es") is not None else (data.get("translation") if data.get("translation") is not None else data.get("ru"))
         if not isinstance(tr, str):
             raise TranslationError("translation field missing")
         tr = tr.strip()
         if not tr or len(tr) > 60:
             raise TranslationError("translation invalid")
-        if lang not in ("en", "es") and CYR.search(tr):
-            raise TranslationError("translation invalid")
+        if lang in ("en", "es"):
+            if not CYR.search(tr):
+                raise TranslationError("translation must be in Russian")
+        else:
+            if CYR.search(tr):
+                raise TranslationError("translation must not be Cyrillic")
         return tr
     except (ValueError, TypeError, KeyError) as e:
         raise TranslationError(f"Некорректный JSON от модели: {e}") from e

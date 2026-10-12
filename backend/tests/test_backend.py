@@ -67,6 +67,18 @@ def test_parse_response_validation():
     assert parse_response(txt, {1, 2}) == {1: "amor"}
 
 
+def test_parse_response_es_ru_mode():
+    # Spanish to Russian mode (lang="es")
+    # Case 1: JSON includes both source "es" and translation "ru"
+    txt_with_both = '```json\n{"translations":[{"id":8,"es":"la","ru":"Вера"},{"id":9,"es":"fe","ru":"в"},{"id":10,"es":"en","ru":"Иисус Христос"}]}\n```'
+    parsed = parse_response(txt_with_both, {8, 9, 10}, lang="es")
+    assert parsed == {8: "Вера", 9: "в", 10: "Иисус Христос"}
+
+    # Case 2: Non-Cyrillic values should be filtered out in es mode
+    txt_non_cyr = '```json\n{"translations":[{"id":8,"ru":"la"},{"id":9,"ru":"вера"}]}\n```'
+    assert parse_response(txt_non_cyr, {8, 9}, lang="es") == {9: "вера"}
+
+
 def make_app(tmp_path, key="k", epub_mgr=None):
     s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key=key)
     mgr = epub_mgr or DummyEpubManager()
