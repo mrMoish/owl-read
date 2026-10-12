@@ -137,14 +137,35 @@ export default function App() {
   };
 
   const isRootPath = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
+  const isForceSelect = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("select");
 
-  if (isRootPath) {
+  useEffect(() => {
+    if (isRootPath && !isForceSelect) {
+      if (mode && mode.path && mode.path !== "/") {
+        window.location.replace(mode.path);
+      }
+    }
+  }, [isRootPath, isForceSelect, mode]);
+
+  if (isRootPath && (isForceSelect || !mode || mode.path === "/")) {
     return <ModeSelector />;
   }
 
   return (
     <>
       <main className="page">
+        <div style={{ textAlign: "right", marginBottom: "8px" }}>
+          <a
+            href="/?select=true"
+            style={{
+              fontSize: "12px",
+              color: "#666",
+              textDecoration: "underline",
+            }}
+          >
+            Сменить режим / Cambiar modo
+          </a>
+        </div>
         {/* TEMPORARY FEATURE: Navigation button on /ru-es/ to switch to /ru-es-translit/. Intended for future removal. */}
         {mode.id === "ru-es" && (
           <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>

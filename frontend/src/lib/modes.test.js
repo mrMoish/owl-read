@@ -1,6 +1,6 @@
-import { test } from "node:test";
+import { test, beforeEach } from "node:test";
 import assert from "node:assert";
-import { getModeByPath, MODES } from "./modes.js";
+import { getModeByPath, MODES, saveSelectedMode, loadSelectedMode, activeMode } from "./modes.js";
 
 test("Modes configuration defines canonical modes correctly", () => {
   assert.strictEqual(MODES["ru-es"].source, "ru");
@@ -41,4 +41,26 @@ test("Backward compatibility routes map to appropriate canonical modes", () => {
   assert.strictEqual(getModeByPath("/s3/"), MODES["ru-es-translit"]);
   assert.strictEqual(getModeByPath("/s4/"), MODES["en-ru"]);
   assert.strictEqual(getModeByPath("/en/"), MODES["en-ru"]);
+});
+
+test("Mode persistence in localStorage", () => {
+  const mockStorage = {};
+  global.window = {
+    localStorage: {
+      getItem: (k) => mockStorage[k] || null,
+      setItem: (k, v) => { mockStorage[k] = String(v); },
+    },
+    location: { pathname: "/" },
+  };
+
+  saveSelectedMode("es-ru-translit");
+  assert.strictEqual(loadSelectedMode(), MODES["es-ru-translit"]);
+  assert.strictEqual(activeMode(), MODES["es-ru-translit"]);
+
+  // Test activeMode updates persistence when path matches
+  global.window.location.pathname = "/en-ru/";
+  assert.strictEqual(activeMode(), MODES["en-ru"]);
+  assert.strictEqual(loadSelectedMode(), MODES["en-ru"]);
+
+  delete global.window;
 });

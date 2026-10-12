@@ -61,9 +61,34 @@ export const MODES = {
 };
 
 export const DEFAULT_MODE = MODES["ru-es"];
+const MODE_STORAGE_KEY = "reader.selected_mode";
+
+export function loadSelectedMode() {
+  if (typeof window === "undefined" || !window.localStorage) return null;
+  try {
+    const savedId = window.localStorage.getItem(MODE_STORAGE_KEY);
+    if (savedId && MODES[savedId]) {
+      return MODES[savedId];
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return null;
+}
+
+export function saveSelectedMode(modeId) {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    if (modeId && MODES[modeId]) {
+      window.localStorage.setItem(MODE_STORAGE_KEY, modeId);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 export function getModeByPath(pathname = "") {
-  if (!pathname || typeof pathname !== "string") return DEFAULT_MODE;
+  if (!pathname || typeof pathname !== "string") return null;
   const path = pathname.toLowerCase();
 
   // Canonical routes
@@ -79,12 +104,19 @@ export function getModeByPath(pathname = "") {
   if (path.startsWith("/s2") || path.startsWith("/ru")) return MODES["es-ru"];
   if (path.startsWith("/s4") || path.startsWith("/en")) return MODES["en-ru"];
 
-  return DEFAULT_MODE;
+  return null;
 }
 
 export function activeMode() {
   if (typeof window !== "undefined" && window.location?.pathname) {
-    return getModeByPath(window.location.pathname);
+    const modeFromPath = getModeByPath(window.location.pathname);
+    if (modeFromPath) {
+      saveSelectedMode(modeFromPath.id);
+      return modeFromPath;
+    }
   }
+  const savedMode = loadSelectedMode();
+  if (savedMode) return savedMode;
+
   return DEFAULT_MODE;
 }
