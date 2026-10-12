@@ -11,6 +11,7 @@ const RU_TO_LATIN = {
   з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o",
   п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts",
   ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "'", э: "e", ю: "yu", я: "ya",
+  "\u044a": "", "\u042a": "",
 };
 
 const ES_TO_CYRILLIC = {
@@ -30,9 +31,15 @@ const ES_TO_CYRILLIC = {
 
 export function transliterateRussianToLatin(text) {
   if (!text || typeof text !== "string") return text;
-  return text
+
+  let str = text;
+  // Специфические фонетические правила для испанцев (например, быть -> Bit')
+  str = str.replace(/Быть\b/g, "Bit'").replace(/быть\b/g, "bit'");
+  str = str.replace(/Быт/g, "Bit").replace(/быт/g, "bit");
+
+  return str
     .split("")
-    .map((char) => RU_TO_LATIN[char] || char)
+    .map((char) => (RU_TO_LATIN[char] !== undefined ? RU_TO_LATIN[char] : char))
     .join("");
 }
 
@@ -46,7 +53,7 @@ export function transliterateSpanishToCyrillic(text) {
 
   return res
     .split("")
-    .map((char) => ES_TO_CYRILLIC[char] || char)
+    .map((char) => (ES_TO_CYRILLIC[char] !== undefined ? ES_TO_CYRILLIC[char] : char))
     .join("");
 }
 
