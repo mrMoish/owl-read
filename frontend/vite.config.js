@@ -8,6 +8,10 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
+        "ru-es": resolve(__dirname, "ru-es/index.html"),
+        "es-ru": resolve(__dirname, "es-ru/index.html"),
+        "ru-es-translit": resolve(__dirname, "ru-es-translit/index.html"),
+        "en-ru": resolve(__dirname, "en-ru/index.html"),
         s1: resolve(__dirname, "s1/index.html"),
         s2: resolve(__dirname, "s2/index.html"),
         s3: resolve(__dirname, "s3/index.html"),

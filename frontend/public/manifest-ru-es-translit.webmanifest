@@ -1,0 +1,16 @@
+{
+  "name": "Ruso (Transliterado)",
+  "short_name": "Ruso",
+  "description": "Ежедневное чтение и перевод с транслитерацией",
+  "start_url": "/ru-es-translit/",
+  "scope": "/ru-es-translit/",
+  "id": "/ru-es-translit/",
+  "display": "standalone",
+  "background_color": "#F2F3EE",
+  "theme_color": "#F2F3EE",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,34 +1,39 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { MODES, getModeByPath } from "./modes.js";
+import { test } from "node:test";
+import assert from "node:assert";
+import { getModeByPath, MODES } from "./modes.js";
 
-test("Modes configuration defines S1, S2, S3, S4 correctly", () => {
-  assert.equal(MODES.s1.source, "ru");
-  assert.equal(MODES.s1.target, "es");
-  assert.equal(MODES.s1.transliterate, false);
+test("Modes configuration defines canonical modes correctly", () => {
+  assert.strictEqual(MODES["ru-es"].source, "ru");
+  assert.strictEqual(MODES["ru-es"].target, "es");
+  assert.strictEqual(MODES["ru-es"].transliterate, false);
+  assert.strictEqual(MODES["ru-es"].path, "/ru-es/");
 
-  assert.equal(MODES.s2.source, "es");
-  assert.equal(MODES.s2.target, "ru");
-  assert.equal(MODES.s2.transliterate, false);
+  assert.strictEqual(MODES["es-ru"].source, "es");
+  assert.strictEqual(MODES["es-ru"].target, "ru");
+  assert.strictEqual(MODES["es-ru"].transliterate, false);
 
-  assert.equal(MODES.s3.source, "ru");
-  assert.equal(MODES.s3.target, "es");
-  assert.equal(MODES.s3.transliterate, true);
+  assert.strictEqual(MODES["ru-es-translit"].source, "ru");
+  assert.strictEqual(MODES["ru-es-translit"].target, "es");
+  assert.strictEqual(MODES["ru-es-translit"].transliterate, true);
 
-  assert.equal(MODES.s4.source, "en");
-  assert.equal(MODES.s4.target, "ru");
-  assert.equal(MODES.s4.transliterate, false);
+  assert.strictEqual(MODES["en-ru"].source, "en");
+  assert.strictEqual(MODES["en-ru"].target, "ru");
+  assert.strictEqual(MODES["en-ru"].transliterate, false);
 });
 
-test("Route detection resolves explicit /s1/, /s2/, /s3/, /s4/ routes", () => {
-  assert.equal(getModeByPath("/s1/").id, "s1");
-  assert.equal(getModeByPath("/s2/").id, "s2");
-  assert.equal(getModeByPath("/s3/").id, "s3");
-  assert.equal(getModeByPath("/s4/").id, "s4");
+test("Route detection resolves canonical /ru-es/, /es-ru/, /ru-es-translit/, /en-ru/ routes", () => {
+  assert.strictEqual(getModeByPath("/ru-es/"), MODES["ru-es"]);
+  assert.strictEqual(getModeByPath("/es-ru/"), MODES["es-ru"]);
+  assert.strictEqual(getModeByPath("/ru-es-translit/"), MODES["ru-es-translit"]);
+  assert.strictEqual(getModeByPath("/en-ru/"), MODES["en-ru"]);
 });
 
-test("Backward compatibility routes map to appropriate modes", () => {
-  assert.equal(getModeByPath("/es/").id, "s1");
-  assert.equal(getModeByPath("/ru/").id, "s2");
-  assert.equal(getModeByPath("/en/").id, "s4");
+test("Backward compatibility routes map to appropriate canonical modes", () => {
+  assert.strictEqual(getModeByPath("/s1/"), MODES["ru-es"]);
+  assert.strictEqual(getModeByPath("/es/"), MODES["ru-es"]);
+  assert.strictEqual(getModeByPath("/s2/"), MODES["es-ru"]);
+  assert.strictEqual(getModeByPath("/ru/"), MODES["es-ru"]);
+  assert.strictEqual(getModeByPath("/s3/"), MODES["ru-es-translit"]);
+  assert.strictEqual(getModeByPath("/s4/"), MODES["en-ru"]);
+  assert.strictEqual(getModeByPath("/en/"), MODES["en-ru"]);
 });
