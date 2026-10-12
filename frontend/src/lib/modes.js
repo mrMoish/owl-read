@@ -1,11 +1,11 @@
 /**
- * Centralized configuration for learning modes (S1, S2, S3, S4).
+ * Centralized authoritative configuration for learning modes.
  */
 
 export const MODES = {
-  s1: {
-    id: "s1",
-    path: "/s1/",
+  "ru-es": {
+    id: "ru-es",
+    path: "/ru-es/",
     source: "ru",
     target: "es",
     transliterate: false,
@@ -14,31 +14,31 @@ export const MODES = {
     subtitle: "Русскоговорящие учат испанский",
     description: "Ежедневное чтение на русском с переводом на испанский при нажатии на слова.",
   },
-  s2: {
-    id: "s2",
-    path: "/s2/",
+  "es-ru": {
+    id: "es-ru",
+    path: "/es-ru/",
     source: "es",
     target: "ru",
     transliterate: false,
     pair: "es → ru",
     title: "Para hispanohablantes",
     subtitle: "Испаноговорящие учат русский",
-    description: "Lectura diaria en ruso con traducción al español al tocar cada palabra.",
+    description: "Lectura diaria en español con traducción al ruso al tocar cada palabra.",
   },
-  s3: {
-    id: "s3",
-    path: "/s3/",
+  "ru-es-translit": {
+    id: "ru-es-translit",
+    path: "/ru-es-translit/",
     source: "ru",
     target: "es",
     transliterate: true,
     pair: "ru → es (транслитерация)",
-    title: "Для русскоговорящих (транслитерация)",
+    title: "Для русскоговорящих (с транслитерацией)",
     subtitle: "Русскоговорящие учат испанский с транслитерацией",
     description: "Ежедневное чтение на русском с транслитерацией слова и переводом.",
   },
-  s4: {
-    id: "s4",
-    path: "/s4/",
+  "en-ru": {
+    id: "en-ru",
+    path: "/en-ru/",
     source: "en",
     target: "ru",
     transliterate: false,
@@ -49,20 +49,23 @@ export const MODES = {
   },
 };
 
-export const DEFAULT_MODE = MODES.s1;
+export const DEFAULT_MODE = MODES["ru-es"];
 
 export function getModeByPath(pathname = "") {
   if (!pathname || typeof pathname !== "string") return DEFAULT_MODE;
   const path = pathname.toLowerCase();
-  if (path.startsWith("/s1")) return MODES.s1;
-  if (path.startsWith("/s2")) return MODES.s2;
-  if (path.startsWith("/s3")) return MODES.s3;
-  if (path.startsWith("/s4")) return MODES.s4;
+
+  // Canonical routes
+  if (path.startsWith("/ru-es-translit")) return MODES["ru-es-translit"];
+  if (path.startsWith("/ru-es")) return MODES["ru-es"];
+  if (path.startsWith("/es-ru")) return MODES["es-ru"];
+  if (path.startsWith("/en-ru")) return MODES["en-ru"];
 
   // Backward compatibility routes
-  if (path.startsWith("/es")) return MODES.s1;
-  if (path.startsWith("/ru")) return MODES.s2;
-  if (path.startsWith("/en")) return MODES.s4;
+  if (path.startsWith("/s3")) return MODES["ru-es-translit"];
+  if (path.startsWith("/s1") || path.startsWith("/es")) return MODES["ru-es"];
+  if (path.startsWith("/s2") || path.startsWith("/ru")) return MODES["es-ru"];
+  if (path.startsWith("/s4") || path.startsWith("/en")) return MODES["en-ru"];
 
   return DEFAULT_MODE;
 }

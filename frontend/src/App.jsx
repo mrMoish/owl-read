@@ -16,7 +16,7 @@ import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
 import { transliterateBlock } from "./lib/transliteration.js";
 
-const BUILD_ID = "2026.10.10.v7";
+const BUILD_ID = "2026.10.10.v8";
 
 function flattenText(nodes) {
   return nodes.map((n) => {
@@ -48,7 +48,6 @@ export default function App() {
     }
   }, []);
 
-  // Вычисляем видимые переводы: глобально запомненные слова и словоформы
   const visibleTranslations = useMemo(() => {
     return applyLearnedTranslations({
       meta: data?.meta,
@@ -60,7 +59,6 @@ export default function App() {
   const sourceLang = mode.source;
   const targetLang = mode.target;
 
-  // Отображение с транслитерацией если режим требует ее (например, S3)
   const displayVerse = useMemo(() => {
     if (!data?.verse) return null;
     if (mode.transliterate) {
@@ -135,6 +133,28 @@ export default function App() {
   return (
     <>
       <main className="page">
+        {/* TEMPORARY FEATURE: Navigation button on /es-ru/ to switch to /ru-es-translit/. Intended for future removal. */}
+        {mode.id === "es-ru" && (
+          <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
+            <a
+              href="/ru-es-translit/"
+              className="temp-nav-btn"
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                backgroundColor: "#0F6B63",
+                color: "#FFFFFF",
+                borderRadius: "20px",
+                textDecoration: "none",
+                fontWeight: "500",
+                fontSize: "14px",
+              }}
+            >
+              Probar español con transliteración
+            </a>
+          </div>
+        )}
+
         {isDebug && (
           <section className="debug-panel" style={{ background: "#111", color: "#0f0", padding: "12px", borderRadius: "8px", fontSize: "12px", fontFamily: "monospace", marginBottom: "16px", wordBreak: "break-all" }}>
             <h3>[Diagnostic Panel]</h3>

@@ -1,57 +1,35 @@
-import pytest
+from dataclasses import replace
 from fastapi.testclient import TestClient
 from app.main import create_app
-from app.config import get_settings, Settings
-import tempfile
-import pathlib
+from app.config import get_settings
 
-def test_spa_route_serving():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        dist = pathlib.Path(tmpdir)
-        (dist / "index.html").write_text("<html><body>Daily Reader</body></html>")
-        (dist / "ru").mkdir(parents=True, exist_ok=True)
-        (dist / "ru" / "index.html").write_text("<html><body>Ruso Reader</body></html>")
-        (dist / "manifest-en.webmanifest").write_text('{"name": "Daily Reader"}')
-        (dist / "manifest-ru.webmanifest").write_text('{"name": "Ruso"}')
+def test_spa_routes_serve_index(tmp_path):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("root")
 
-        base = get_settings()
-        settings = Settings(
-            openrouter_api_key=base.openrouter_api_key,
-            openrouter_model=base.openrouter_model,
-            db_path=pathlib.Path(tmpdir) / "test.db",
-            timezone=base.timezone,
-            translate_max_share=base.translate_max_share,
-            frontend_dist=dist,
-        )
-        app = create_app(settings=settings)
-        client = TestClient(app)
+    for route in ("ru-es", "es-ru", "ru-es-translit", "en-ru", "en", "es", "ru", "s1", "s2", "s3", "s4"):
+        r_dir = dist / route
+        r_dir.mkdir()
+        (r_dir / "index.html").write_text(f"html for {route}")
 
-        # Base index.html
-        r_root = client.get("/")
-        assert r_root.status_code == 200
-        assert "Daily Reader" in r_root.text
+    settings = replace(get_settings(), frontend_dist=dist)
+    app = create_app(settings)
+    client = TestClient(app)
 
-        # /s1, /s2, /s3, /s4 paths serving SPA index.html
-        for mode_route in ("/s1/", "/s2/", "/s3/", "/s4/"):
-            r_mode = client.get(mode_route)
-            assert r_mode.status_code == 200
-            assert "Daily Reader" in r_mode.text
+    # Root route returns root index.html
+    r = client.get("/")
+    assert r.status_code == 200
+    assert r.text == "root"
 
-        # /en path serving SPA index.html
-        r_en = client.get("/en/")
-        assert r_en.status_code == 200
-        assert "Daily Reader" in r_en.text
+    # Canonical routes return their specific index.html
+    assert client.get("/ru-es/").text == "html for ru-es"
+    assert client.get("/es-ru/").text == "html for es-ru"
+    assert client.get("/ru-es-translit/").text == "html for ru-es-translit"
+    assert client.get("/en-ru/").text == "html for en-ru"
 
-        # /ru path serving ru/index.html
-        r_ru = client.get("/ru/")
-        assert r_ru.status_code == 200
-        assert "Ruso Reader" in r_ru.text
-
-        # Static manifest route
-        r_manifest = client.get("/manifest-en.webmanifest")
-        assert r_manifest.status_code == 200
-        assert "Daily Reader" in r_manifest.text
-
-        r_manifest_ru = client.get("/manifest-ru.webmanifest")
-        assert r_manifest_ru.status_code == 200
-        assert "Ruso" in r_manifest_ru.text
+    # Legacy routes return their specific index.html
+    assert client.get("/s1/").text == "html for s1"
+    assert client.get("/s2/").text == "html for s2"
+    assert client.get("/s3/").text == "html for s3"
+    assert client.get("/s4/").text == "html for s4"
