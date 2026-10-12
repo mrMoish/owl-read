@@ -38,6 +38,7 @@ export default function App() {
   const [pronunciationWordData, setPronunciationWordData] = useState(null);
   const [loadingTokens, setLoadingTokens] = useState({});
   const [tokenTranslations, setTokenTranslations] = useState({});
+  const [frontendCache, setFrontendCache] = useState({});
 
   const [isDebug, setIsDebug] = useState(false);
   const [swControlled, setSwControlled] = useState(false);
@@ -124,28 +125,35 @@ export default function App() {
 
     const currentDate = data.date;
     const currentModeId = mode.id;
-    setLoadingTokens((prev) => ({ ...prev, [key]: true }));
+    const cacheKey = `${currentDate}:${currentModeId}:${key}`;
 
-    let translated = null;
-    try {
-      const payload = {
-        word,
-        lemma: lemma || word,
-        sentence,
-        context: context || articleContext(data),
-        date: currentDate,
-        lang: sourceLang,
-      };
-      const res = await translateWord(payload);
-      translated = res?.translation || res?.original || word;
-    } catch {
-      // Translation request failed
-    } finally {
-      setLoadingTokens((prev) => {
-        const copy = { ...prev };
-        delete copy[key];
-        return copy;
-      });
+    let translated = frontendCache[cacheKey];
+
+    if (!translated) {
+      setLoadingTokens((prev) => ({ ...prev, [key]: true }));
+      try {
+        const payload = {
+          word,
+          lemma: lemma || word,
+          sentence,
+          context: context || articleContext(data),
+          date: currentDate,
+          lang: sourceLang,
+        };
+        const res = await translateWord(payload);
+        translated = res?.translation || res?.original || word;
+        if (translated && translated !== word) {
+          setFrontendCache((prev) => ({ ...prev, [cacheKey]: translated }));
+        }
+      } catch {
+        // Translation request failed
+      } finally {
+        setLoadingTokens((prev) => {
+          const copy = { ...prev };
+          delete copy[key];
+          return copy;
+        });
+      }
     }
 
     if (!translated || translated === word) {
