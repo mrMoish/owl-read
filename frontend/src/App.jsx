@@ -16,7 +16,7 @@ import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
 import { transliterateBlock, transliterateRussianToLatin } from "./lib/transliteration.js";
 
-const BUILD_ID = "2026.10.10.v10";
+const BUILD_ID = "2026.10.10.v11";
 
 function flattenText(nodes) {
   return nodes.map((n) => {
@@ -163,6 +163,28 @@ export default function App() {
               }}
             >
               Leer más rápido
+            </a>
+          </div>
+        )}
+
+        {/* TEMPORARY FEATURE: Navigation button on /ru-es-translit/ to switch to /ru-es/. Intended for future removal. */}
+        {mode.id === "ru-es-translit" && (
+          <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
+            <a
+              href="/ru-es/"
+              className="temp-nav-btn"
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                backgroundColor: "#0F6B63",
+                color: "#FFFFFF",
+                borderRadius: "20px",
+                textDecoration: "none",
+                fontWeight: "500",
+                fontSize: "14px",
+              }}
+            >
+              Leer en español
             </a>
           </div>
         )}
