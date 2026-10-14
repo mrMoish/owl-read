@@ -302,6 +302,34 @@ export default function App() {
           </div>
         )}
 
+        {/* TEMPORARY FEATURE: Navigation button on /es-ru-translit/ to switch to /ru-es/. Intended for future removal. */}
+        {mode.id === "es-ru-translit" && (
+          <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
+            <a
+              href="/ru-es/"
+              target="_self"
+              className="temp-nav-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                saveSelectedMode("ru-es");
+                window.location.href = "/ru-es/";
+              }}
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                backgroundColor: "#0F6B63",
+                color: "#FFFFFF",
+                borderRadius: "20px",
+                textDecoration: "none",
+                fontWeight: "500",
+                fontSize: "14px",
+              }}
+            >
+              Leer en ruso
+            </a>
+          </div>
+        )}
+
         {/* TEMPORARY FEATURE: Navigation button on /ru-es-translit/ to switch to /es-ru-translit/. Intended for future removal. */}
         {mode.id === "ru-es-translit" && (
           <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
