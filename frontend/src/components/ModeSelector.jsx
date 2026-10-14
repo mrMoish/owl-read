@@ -1,5 +1,5 @@
 import React from "react";
-import { MODES } from "../lib/modes.js";
+import { MODES, saveSelectedMode } from "../lib/modes.js";
 
 export default function ModeSelector() {
   const modesList = Object.values(MODES);
@@ -18,6 +18,7 @@ export default function ModeSelector() {
           <a
             key={m.id}
             href={m.path}
+            onClick={() => saveSelectedMode(m.id)}
             className="mode-card"
             style={{
               display: "block",

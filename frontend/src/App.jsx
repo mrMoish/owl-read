@@ -17,6 +17,7 @@ import PronunciationModal from "./components/PronunciationModal.jsx";
 import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
 import { transliterateBlock, transliterateRussianToLatin } from "./lib/transliteration.js";
+import { saveSelectedMode, loadSelectedMode } from "./lib/modes.js";
 
 const BUILD_ID = "2026.10.10.v14";
 
@@ -253,7 +254,20 @@ export default function App() {
 
   const isRootPath = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
 
+  useEffect(() => {
+    if (isRootPath) {
+      const savedMode = loadSelectedMode();
+      if (savedMode && savedMode.path) {
+        window.location.replace(savedMode.path);
+      }
+    }
+  }, [isRootPath]);
+
   if (isRootPath) {
+    const savedMode = loadSelectedMode();
+    if (savedMode && savedMode.path) {
+      return null;
+    }
     return <ModeSelector />;
   }
 
@@ -266,6 +280,7 @@ export default function App() {
             <a
               href="/ru-es-translit/"
               className="temp-nav-btn"
+              onClick={() => saveSelectedMode("ru-es-translit")}
               style={{
                 display: "inline-block",
                 padding: "8px 16px",
@@ -288,6 +303,7 @@ export default function App() {
             <a
               href="/es-ru-translit/"
               className="temp-nav-btn"
+              onClick={() => saveSelectedMode("es-ru-translit")}
               style={{
                 display: "inline-block",
                 padding: "8px 16px",

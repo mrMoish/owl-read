@@ -62,6 +62,50 @@ export const MODES = {
 
 export const DEFAULT_MODE = MODES["ru-es"];
 
+const SELECTED_MODE_KEY = "reader.selected_mode";
+
+function getStorage() {
+  if (typeof window !== "undefined" && window.localStorage) return window.localStorage;
+  if (typeof localStorage !== "undefined") return localStorage;
+  return null;
+}
+
+export function loadSelectedMode() {
+  const storage = getStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(SELECTED_MODE_KEY);
+    if (!raw) return null;
+    if (MODES[raw]) return MODES[raw];
+    const resolved = getModeByPath(raw);
+    return resolved !== DEFAULT_MODE || raw.startsWith("/s") || raw.startsWith("/ru-es") ? resolved : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSelectedMode(modeIdOrPath) {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    if (!modeIdOrPath) return;
+    let modeId = modeIdOrPath;
+    if (typeof modeIdOrPath === "object" && modeIdOrPath.id) {
+      modeId = modeIdOrPath.id;
+    } else if (MODES[modeIdOrPath]) {
+      modeId = modeIdOrPath;
+    } else {
+      const mode = getModeByPath(modeIdOrPath);
+      if (mode) modeId = mode.id;
+    }
+    if (typeof modeId === "string" && MODES[modeId]) {
+      storage.setItem(SELECTED_MODE_KEY, modeId);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function getModeByPath(pathname = "") {
   if (!pathname || typeof pathname !== "string") return DEFAULT_MODE;
   const path = pathname.toLowerCase();
@@ -84,7 +128,12 @@ export function getModeByPath(pathname = "") {
 
 export function activeMode() {
   if (typeof window !== "undefined" && window.location?.pathname) {
-    return getModeByPath(window.location.pathname);
+    const path = window.location.pathname;
+    if (path !== "/" && path !== "") {
+      const mode = getModeByPath(path);
+      saveSelectedMode(mode.id);
+      return mode;
+    }
   }
   return DEFAULT_MODE;
 }
