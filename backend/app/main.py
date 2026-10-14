@@ -12,7 +12,7 @@ from .daily import DailyService
 from .store import Store
 from .translation.openrouter import OpenRouterClient
 from .translation.service import TranslationService
-from .epub import EpubBrochureManager, EpubError
+from .epub import EpubBrochureManager, WatchtowerEPUBManager, EpubError
 
 log = logging.getLogger("reader")
 
@@ -26,7 +26,7 @@ def _resolve_lang(lang_param: str | None, en_param: str | None) -> str:
     return "ru"
 
 
-def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManager | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManager | None = None, watchtower_manager: WatchtowerEPUBManager | None = None) -> FastAPI:
     s = settings or get_settings()
     store = Store(s.db_path)
     client = OpenRouterClient(s.openrouter_api_key, s.openrouter_model) if s.openrouter_api_key else None
@@ -34,7 +34,8 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
         log.warning("OPENROUTER_API_KEY не задан: перевод отключён, текст останется на русском")
     tr = TranslationService(store, client, s.translate_max_share)
     epub_mgr = epub_manager or EpubBrochureManager()
-    daily = DailyService(s, store, tr, epub_manager=epub_mgr)
+    wt_mgr = watchtower_manager or WatchtowerEPUBManager(storage_dir=epub_mgr.storage_dir)
+    daily = DailyService(s, store, tr, epub_manager=epub_mgr, watchtower_manager=wt_mgr)
     app = FastAPI(title="Daily Reader")
     origins = [
         o.strip().rstrip("/")

@@ -79,3 +79,15 @@ export const saveUserSettings = (settings) => safe(() => {
   localStorage.setItem("reader.settings", JSON.stringify(updated));
   return updated;
 });
+
+export const loadDailyReadStatus = (date) => safe(() => {
+  if (!date) return false;
+  const key = `reader.daily_read.${date}`;
+  return localStorage.getItem(key) === "true";
+}, false);
+
+export const saveDailyReadStatus = (date, status = true) => safe(() => {
+  if (!date) return;
+  const key = `reader.daily_read.${date}`;
+  localStorage.setItem(key, status ? "true" : "false");
+});

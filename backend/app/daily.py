@@ -6,15 +6,16 @@ import time
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 from .textproc.analyzer import analyze_blocks, priority_order
-from .epub import EpubBrochureManager, EpubError
+from .epub import EpubBrochureManager, WatchtowerEPUBManager, EpubError
 
 log = logging.getLogger("daily_service")
 
 
 class DailyService:
-    def __init__(self, settings, store, translator, epub_manager: EpubBrochureManager | None = None):
+    def __init__(self, settings, store, translator, epub_manager: EpubBrochureManager | None = None, watchtower_manager: WatchtowerEPUBManager | None = None):
         self.s, self.store, self.tr = settings, store, translator
         self.epub_mgr = epub_manager or EpubBrochureManager()
+        self.wt_mgr = watchtower_manager or WatchtowerEPUBManager(storage_dir=self.epub_mgr.storage_dir)
         self._locks: dict[str, asyncio.Lock] = {}
         log.info("[DailyService] Initialized with timezone=%s", self.s.timezone)
 
@@ -40,8 +41,19 @@ class DailyService:
         log.info("[DailyService Get] Requested daily content: date=%s lang=%s", key, lang)
 
         start_time = time.monotonic()
+        # Удаляем журнал Сторожевой Башни при его завершении/прохождении
+        self.wt_mgr.clean_expired_magazines(day, lang=lang)
+
         saved = self.store.get_daily(key, lang=lang)
         if saved:
+            # Если статья Изучения Сторожевой Башни доступна, но ещё не была сохранена с текстом дня
+            if "article" not in saved:
+                art = await self.wt_mgr.get_article_for_date(day, lang=lang)
+                if art:
+                    saved_parsed = {"date_label": saved["date_label"], "title": saved["title"],
+                                    "verse": saved["verse"], "comment": saved["comment"]}
+                    saved = self.build(saved_parsed, key, lang=lang, article_raw=art)
+                    self.store.put_daily(key, saved, lang=lang)
             elapsed = time.monotonic() - start_time
             log.info("[DailyService Cache Hit] Found daily content in store: date=%s lang=%s duration=%.3fs",
                      key, lang, elapsed)
@@ -53,6 +65,13 @@ class DailyService:
         async with lock:
             saved = self.store.get_daily(key, lang=lang)
             if saved:
+                if "article" not in saved:
+                    art = await self.wt_mgr.get_article_for_date(day, lang=lang)
+                    if art:
+                        saved_parsed = {"date_label": saved["date_label"], "title": saved["title"],
+                                        "verse": saved["verse"], "comment": saved["comment"]}
+                        saved = self.build(saved_parsed, key, lang=lang, article_raw=art)
+                        self.store.put_daily(key, saved, lang=lang)
                 log.info("[DailyService Cache Hit] Found daily content after lock acquisition: date=%s lang=%s", key, lang)
                 return saved, None
 
@@ -67,7 +86,11 @@ class DailyService:
                 fetch_start = time.monotonic()
                 epub_path = await self.epub_mgr.fetch_brochure_epub(day.year, lang=lang)
                 parsed = self.epub_mgr.parse_entry_from_epub(epub_path, day, lang=lang)
-                content = self.build(parsed, key, lang=lang)
+
+                # Попытка получить статью для изучения Сторожевой Башни за эту дату
+                art = await self.wt_mgr.get_article_for_date(day, lang=lang)
+
+                content = self.build(parsed, key, lang=lang, article_raw=art)
                 total_duration = time.monotonic() - fetch_start
                 log.info("[DailyService Build Success] Built daily content: date=%s lang=%s duration=%.3fs",
                          key, lang, total_duration)
@@ -114,19 +137,44 @@ class DailyService:
         return {"nodes": []}
 
     @classmethod
-    def build(cls, parsed: dict, key: str, lang: str = "ru") -> dict:
+    def build(cls, parsed: dict, key: str, lang: str = "ru", article_raw: dict | None = None) -> dict:
         verse_raw = parsed.get("verse", "")
         comment_raw = parsed.get("comment", [])
         raw_blocks = [cls._to_nodes_block(verse_raw)] + [cls._to_nodes_block(c) for c in comment_raw]
 
+        article_paras = article_raw.get("paragraphs", []) if article_raw else []
+        if article_paras:
+            raw_blocks += [cls._to_nodes_block(p) for p in article_paras]
+
         blocks, meta, _ = analyze_blocks(raw_blocks, lang=lang)
-        return {"date": key, "date_label": parsed["date_label"], "title": parsed["title"],
-                "verse": blocks[0], "comment": blocks[1:],
-                "order": priority_order(meta), "meta": {str(k): v for k, v in meta.items()}}
+
+        comment_count = len(comment_raw)
+        res = {
+            "date": key,
+            "date_label": parsed["date_label"],
+            "title": parsed["title"],
+            "verse": blocks[0],
+            "comment": blocks[1:1 + comment_count],
+            "order": priority_order(meta),
+            "meta": {str(k): v for k, v in meta.items()},
+        }
+
+        if article_raw and article_paras:
+            article_blocks = blocks[1 + comment_count:]
+            res["article"] = {
+                "title": article_raw.get("title", ""),
+                "date_range_label": article_raw.get("date_range_label", ""),
+                "comment": article_blocks,
+            }
+
+        return res
 
     def public(self, content: dict, translations: dict, status: str, notice=None) -> dict:
-        return {"date": content["date"], "date_label": content["date_label"], "title": content["title"],
-                "verse": content["verse"], "comment": content["comment"], "order": content["order"],
-                "meta": {str(k): v for k, v in content.get("meta", {}).items()},
-                "translations": {str(k): v for k, v in translations.items()},
-                "translations_status": status, "notice": notice}
+        res = {"date": content["date"], "date_label": content["date_label"], "title": content["title"],
+               "verse": content["verse"], "comment": content["comment"], "order": content["order"],
+               "meta": {str(k): v for k, v in content.get("meta", {}).items()},
+               "translations": {str(k): v for k, v in translations.items()},
+               "translations_status": status, "notice": notice}
+        if "article" in content:
+            res["article"] = content["article"]
+        return res
