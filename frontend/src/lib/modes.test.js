@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { getModeByPath, MODES } from "./modes.js";
+import { getModeByPath, MODES, saveSelectedMode, loadSelectedMode, activeMode } from "./modes.js";
+
+const memoryStore = new Map();
+globalThis.localStorage = {
+  getItem: (key) => memoryStore.get(key) || null,
+  setItem: (key, val) => memoryStore.set(key, String(val)),
+  removeItem: (key) => memoryStore.delete(key),
+  clear: () => memoryStore.clear(),
+};
 
 test("Modes configuration defines canonical modes correctly", () => {
   assert.strictEqual(MODES["ru-es"].source, "ru");
@@ -41,4 +49,34 @@ test("Backward compatibility routes map to appropriate canonical modes", () => {
   assert.strictEqual(getModeByPath("/s3/"), MODES["ru-es-translit"]);
   assert.strictEqual(getModeByPath("/s4/"), MODES["en-ru"]);
   assert.strictEqual(getModeByPath("/en/"), MODES["en-ru"]);
+});
+
+test("Selected mode persistence: saveSelectedMode and loadSelectedMode", () => {
+  globalThis.localStorage.clear();
+
+  assert.strictEqual(loadSelectedMode(), null);
+
+  // Save by mode ID
+  saveSelectedMode("ru-es-translit");
+  assert.strictEqual(loadSelectedMode(), MODES["ru-es-translit"]);
+
+  // Save by mode object
+  saveSelectedMode(MODES["es-ru-translit"]);
+  assert.strictEqual(loadSelectedMode(), MODES["es-ru-translit"]);
+
+  // Save by path
+  saveSelectedMode("/en-ru/");
+  assert.strictEqual(loadSelectedMode(), MODES["en-ru"]);
+});
+
+test("activeMode auto-persists mode when visiting non-root paths", () => {
+  globalThis.localStorage.clear();
+
+  globalThis.window = {
+    location: { pathname: "/es-ru-translit/" },
+  };
+
+  const mode = activeMode();
+  assert.strictEqual(mode, MODES["es-ru-translit"]);
+  assert.strictEqual(loadSelectedMode(), MODES["es-ru-translit"]);
 });

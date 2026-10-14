@@ -17,6 +17,7 @@ import PronunciationModal from "./components/PronunciationModal.jsx";
 import ModeSelector from "./components/ModeSelector.jsx";
 import { useDaily } from "./useDaily.js";
 import { transliterateBlock, transliterateRussianToLatin } from "./lib/transliteration.js";
+import { saveSelectedMode, loadSelectedMode } from "./lib/modes.js";
 
 const BUILD_ID = "2026.10.10.v14";
 
@@ -253,7 +254,20 @@ export default function App() {
 
   const isRootPath = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
 
+  useEffect(() => {
+    if (isRootPath) {
+      const savedMode = loadSelectedMode();
+      if (savedMode && savedMode.path) {
+        window.location.replace(savedMode.path);
+      }
+    }
+  }, [isRootPath]);
+
   if (isRootPath) {
+    const savedMode = loadSelectedMode();
+    if (savedMode && savedMode.path) {
+      return null;
+    }
     return <ModeSelector />;
   }
 
@@ -265,7 +279,13 @@ export default function App() {
           <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
             <a
               href="/ru-es-translit/"
+              target="_self"
               className="temp-nav-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                saveSelectedMode("ru-es-translit");
+                window.location.href = "/ru-es-translit/";
+              }}
               style={{
                 display: "inline-block",
                 padding: "8px 16px",
@@ -282,12 +302,46 @@ export default function App() {
           </div>
         )}
 
+        {/* TEMPORARY FEATURE: Navigation button on /es-ru-translit/ to switch to /ru-es/. Intended for future removal. */}
+        {mode.id === "es-ru-translit" && (
+          <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
+            <a
+              href="/ru-es/"
+              target="_self"
+              className="temp-nav-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                saveSelectedMode("ru-es");
+                window.location.href = "/ru-es/";
+              }}
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                backgroundColor: "#0F6B63",
+                color: "#FFFFFF",
+                borderRadius: "20px",
+                textDecoration: "none",
+                fontWeight: "500",
+                fontSize: "14px",
+              }}
+            >
+              Leer en ruso
+            </a>
+          </div>
+        )}
+
         {/* TEMPORARY FEATURE: Navigation button on /ru-es-translit/ to switch to /es-ru-translit/. Intended for future removal. */}
         {mode.id === "ru-es-translit" && (
           <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
             <a
               href="/es-ru-translit/"
+              target="_self"
               className="temp-nav-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                saveSelectedMode("es-ru-translit");
+                window.location.href = "/es-ru-translit/";
+              }}
               style={{
                 display: "inline-block",
                 padding: "8px 16px",
