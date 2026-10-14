@@ -274,9 +274,31 @@ export default function App() {
   return (
     <>
       <main className="page">
-        {/* TEMPORARY FEATURE: Navigation button on /ru-es/ to switch to /ru-es-translit/. Intended for future removal. */}
+        {/* TEMPORARY FEATURE: Navigation buttons on /ru-es/ to switch to /es-ru/ or /ru-es-translit/. Intended for future removal. */}
         {mode.id === "ru-es" && (
-          <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
+          <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center", display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
+            <a
+              href="/es-ru/"
+              target="_self"
+              className="temp-nav-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                saveSelectedMode("es-ru");
+                window.location.href = "/es-ru/";
+              }}
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                backgroundColor: "#0F6B63",
+                color: "#FFFFFF",
+                borderRadius: "20px",
+                textDecoration: "none",
+                fontWeight: "500",
+                fontSize: "14px",
+              }}
+            >
+              Leer en español
+            </a>
             <a
               href="/ru-es-translit/"
               target="_self"
@@ -298,6 +320,34 @@ export default function App() {
               }}
             >
               Leer más rápido
+            </a>
+          </div>
+        )}
+
+        {/* TEMPORARY FEATURE: Navigation button on /es-ru/ to switch to /ru-es/. Intended for future removal. */}
+        {mode.id === "es-ru" && (
+          <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
+            <a
+              href="/ru-es/"
+              target="_self"
+              className="temp-nav-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                saveSelectedMode("ru-es");
+                window.location.href = "/ru-es/";
+              }}
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                backgroundColor: "#0F6B63",
+                color: "#FFFFFF",
+                borderRadius: "20px",
+                textDecoration: "none",
+                fontWeight: "500",
+                fontSize: "14px",
+              }}
+            >
+              Leer en ruso
             </a>
           </div>
         )}

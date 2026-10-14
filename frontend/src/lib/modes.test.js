@@ -80,3 +80,28 @@ test("activeMode auto-persists mode when visiting non-root paths", () => {
   assert.strictEqual(mode, MODES["es-ru-translit"]);
   assert.strictEqual(loadSelectedMode(), MODES["es-ru-translit"]);
 });
+
+test("Mode navigation persistence between es-ru (/ru/) and ru-es modes", () => {
+  globalThis.localStorage.clear();
+
+  // Visiting /ru/ (es-ru)
+  globalThis.window = {
+    location: { pathname: "/ru/" },
+  };
+  assert.strictEqual(activeMode(), MODES["es-ru"]);
+  assert.strictEqual(loadSelectedMode(), MODES["es-ru"]);
+
+  // User clicks navigation button to switch to ru-es
+  saveSelectedMode("ru-es");
+  assert.strictEqual(loadSelectedMode(), MODES["ru-es"]);
+
+  // User navigates to /ru-es/
+  globalThis.window = {
+    location: { pathname: "/ru-es/" },
+  };
+  assert.strictEqual(activeMode(), MODES["ru-es"]);
+
+  // User clicks return button to switch back to es-ru
+  saveSelectedMode("es-ru");
+  assert.strictEqual(loadSelectedMode(), MODES["es-ru"]);
+});
