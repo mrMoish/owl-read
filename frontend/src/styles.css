@@ -75,40 +75,30 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 .word--loading {
   color: #889690;
   cursor: wait;
-  white-space: nowrap;
+  animation: wordPulse 1.2s ease-in-out infinite;
 }
 
 .word-letter {
   display: inline;
-  color: #889690;
-  opacity: 0.6;
-  transition: opacity 0.1s ease;
-  animation-name: letterHighlight;
-  animation-iteration-count: infinite;
-  animation-timing-function: ease-in-out;
 }
 
-@keyframes letterHighlight {
+@keyframes wordPulse {
   0% {
     color: #889690;
-    opacity: 0.6;
+    opacity: 0.5;
   }
-  20% {
+  50% {
     color: var(--ink);
     opacity: 1;
   }
-  40% {
-    color: #889690;
-    opacity: 0.6;
-  }
   100% {
     color: #889690;
-    opacity: 0.6;
+    opacity: 0.5;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .word-letter {
+  .word--loading {
     animation: none !important;
     color: #889690 !important;
     opacity: 0.7 !important;
