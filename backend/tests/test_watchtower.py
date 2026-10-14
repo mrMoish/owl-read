@@ -151,3 +151,38 @@ def test_daily_service_with_watchtower_article(tmp_path):
     assert data["article"] is not None
     assert data["article"]["title"] == "Давайте отпор Сатане — полагайтесь на Иегову и Иисуса"
     assert len(data["article"]["comment"]) > 0
+
+
+def test_daily_service_cache_update_with_article(tmp_path):
+    wt_mgr = WatchtowerManager(storage_dir=tmp_path)
+    epub_path = tmp_path / "w_202608_ru.epub"
+    create_sample_watchtower_epub(epub_path, "ru")
+
+    s = replace(get_settings(), db_path=tmp_path / "test_cache.db")
+    store = Store(s.db_path)
+    daily_svc = DailyService(s, store, None, epub_manager=DummyEpubMgr(), wt_manager=wt_mgr)
+
+    # Pre-populate store with cached daily entry that lacks an article
+    fake_cached = {
+        "date": "2026-10-07",
+        "date_label": "7 октября",
+        "title": "Исследуем Писание каждый день 2026",
+        "verse": {"nodes": [{"t": "text", "s": "Стих"}]},
+        "comment": [],
+        "article": None,
+        "order": [],
+        "meta": {"1": {"w": "Стих", "l": "стих"}},
+    }
+    store.put_daily("2026-10-07", fake_cached, lang="ru")
+
+    app = create_app(settings=s, epub_manager=DummyEpubMgr(), wt_manager=wt_mgr)
+    client = TestClient(app)
+
+    res = client.get("/api/daily?date=2026-10-07&lang=ru")
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["date"] == "2026-10-07"
+    assert data["article"] is not None
+    assert data["article"]["title"] == "Давайте отпор Сатане — полагайтесь на Иегову и Иисуса"
+    assert len(data["article"]["comment"]) > 0

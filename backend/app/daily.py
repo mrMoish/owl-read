@@ -43,9 +43,9 @@ class DailyService:
 
         start_time = time.monotonic()
         saved = self.store.get_daily(key, lang=lang)
-        if saved:
+        if saved and saved.get("article") is not None:
             elapsed = time.monotonic() - start_time
-            log.info("[DailyService Cache Hit] Found daily content in store: date=%s lang=%s duration=%.3fs",
+            log.info("[DailyService Cache Hit] Found daily content with article in store: date=%s lang=%s duration=%.3fs",
                      key, lang, elapsed)
             return saved, None
 
@@ -54,8 +54,29 @@ class DailyService:
         log.info("[DailyService Lock] Acquiring lock for %s", lock_key)
         async with lock:
             saved = self.store.get_daily(key, lang=lang)
-            if saved:
-                log.info("[DailyService Cache Hit] Found daily content after lock acquisition: date=%s lang=%s", key, lang)
+            if saved and saved.get("article") is not None:
+                log.info("[DailyService Cache Hit] Found daily content with article after lock acquisition: date=%s lang=%s", key, lang)
+                return saved, None
+
+            # Если кэш есть, но в нём не было статьи, попробуем её найти
+            if saved and saved.get("article") is None:
+                await self.wt_mgr.check_and_fetch_monthly_magazines(day, lang=lang)
+                article_data = self.wt_mgr.find_article_for_date(day, lang=lang)
+                if article_data:
+                    # Извлекаем максимальный ID из существующих метаданных кэша
+                    max_id = max([int(k) for k in saved.get("meta", {}).keys()], default=0)
+                    art_raw = [self._to_nodes_block(b) for b in article_data.get("raw_blocks", [])]
+                    art_blocks, art_meta, _ = analyze_blocks(art_raw, start_id=max_id + 1, lang=lang)
+                    saved["article"] = {
+                        "title": article_data.get("title", ""),
+                        "date_label": article_data.get("date_label", ""),
+                        "comment": art_blocks,
+                    }
+                    saved.get("meta", {}).update({str(k): v for k, v in art_meta.items()})
+                    saved["order"] = priority_order({int(k): v for k, v in saved.get("meta", {}).items()})
+                    self.store.put_daily(key, saved, lang=lang)
+                    log.info("[DailyService Cache Update] Attached article to existing daily cache: date=%s lang=%s", key, lang)
+                    return saved, None
                 return saved, None
 
             log.info("[DailyService Cache Miss] Fetching EPUB brochure and parsing entry: date=%s lang=%s", key, lang)
