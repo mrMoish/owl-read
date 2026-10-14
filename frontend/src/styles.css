@@ -70,7 +70,7 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 /* Loading state for on-demand word translation */
 .word--loading {
   cursor: wait;
-  background: linear-gradient(90deg, var(--muted) 0%, var(--ink) 50%, var(--muted) 100%);
+  background: linear-gradient(90deg, #707c77 0%, var(--ink) 50%, #707c77 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
