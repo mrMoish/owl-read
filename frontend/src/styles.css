@@ -69,32 +69,44 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 
 /* Loading state for on-demand word translation */
 .word--loading {
+  color: #889690;
   cursor: wait;
-  background: linear-gradient(90deg, rgba(136, 150, 144, 0.25) 0%, var(--ink) 50%, rgba(136, 150, 144, 0.25) 100%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: loadingShimmer 1.2s ease-in-out infinite;
 }
 
-@keyframes loadingShimmer {
+.word-letter {
+  display: inline;
+  color: #889690;
+  opacity: 0.6;
+  transition: opacity 0.1s ease;
+  animation-name: letterHighlight;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes letterHighlight {
   0% {
-    background-position: 100% 0;
+    color: #889690;
+    opacity: 0.6;
+  }
+  20% {
+    color: var(--ink);
+    opacity: 1;
+  }
+  40% {
+    color: #889690;
+    opacity: 0.6;
   }
   100% {
-    background-position: -100% 0;
+    color: #889690;
+    opacity: 0.6;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .word--loading {
+  .word-letter {
     animation: none !important;
-    background: none !important;
-    -webkit-background-clip: border-box !important;
-    background-clip: border-box !important;
-    -webkit-text-fill-color: #889690 !important;
     color: #889690 !important;
+    opacity: 0.7 !important;
   }
 }
 
