@@ -453,9 +453,6 @@ class WatchtowerEPUBManager:
         return None
 
     async def get_article_for_date(self, day: date, lang: str = "ru", client: httpx.AsyncClient | None = None) -> dict | None:
-        if day < date(2026, 10, 5):
-            return None
-
         y, m = day.year, day.month
         est_m = m - 2
         est_y = y
