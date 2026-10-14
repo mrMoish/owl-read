@@ -29,7 +29,10 @@ function flattenText(nodes) {
 function articleContext(data) {
   if (!data) return "";
   const blocks = [data.verse, ...(data.comment || [])];
-  return blocks.map((block) => flattenText(block.nodes || [])).join(" ");
+  if (data.article?.comment) {
+    blocks.push(...data.article.comment);
+  }
+  return blocks.map((block) => flattenText(block?.nodes || [])).join(" ");
 }
 
 export default function App() {
@@ -99,6 +102,14 @@ export default function App() {
     }
     return data.comment;
   }, [data?.comment, mode.transliterate, sourceLang, targetLang]);
+
+  const displayArticleComment = useMemo(() => {
+    if (!data?.article?.comment) return [];
+    if (mode.transliterate && mode.source === "ru") {
+      return data.article.comment.map((b) => transliterateBlock(b, sourceLang, targetLang));
+    }
+    return data.article.comment;
+  }, [data?.article?.comment, mode.transliterate, sourceLang, targetLang]);
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
     if (!data?.date || !sentence) {
@@ -276,6 +287,35 @@ export default function App() {
               lang={targetLang}
             />
             {data.title && <p className="source">{data.title}</p>}
+
+            {data.article && (
+              <section className="study-article" style={{ marginTop: "32px", paddingTop: "24px", borderTop: "1px solid var(--border-color, rgba(0,0,0,0.12))" }}>
+                <h2 className="article-section-title" style={{ fontSize: "1.2rem", fontWeight: "600", marginBottom: "8px", color: "#0F6B63" }}>
+                  {targetLang === "es" ? "Artículo de estudio de La Atalaya" : (sourceLang === "en" ? "Watchtower Study Article" : "Сторожевая башня — статья для изучения")}
+                </h2>
+                {data.article.date_label && (
+                  <p className="article-date-label" style={{ fontWeight: "600", marginBottom: "8px" }}>
+                    {data.article.date_label}
+                  </p>
+                )}
+                {data.article.title && (
+                  <h3 className="article-title" style={{ fontSize: "1.1rem", fontWeight: "600", marginBottom: "16px" }}>
+                    {data.article.title}
+                  </h3>
+                )}
+                <Comment
+                  blocks={displayArticleComment}
+                  translations={visibleTranslations}
+                  loadingTokens={loadingTokens}
+                  onWordClick={handleWordClick}
+                  onWordLongPress={handleWordLongPress}
+                  meta={data.meta || {}}
+                  sourceLang={sourceLang}
+                  targetLang={targetLang}
+                  lang={targetLang}
+                />
+              </section>
+            )}
           </article>
         ) : loading ? (
           <p className="notice" role="status">

@@ -1,4 +1,4 @@
-"""Ежедневный материал: загрузка из EPUB брошюр, кэш по дате, откат на последний сохранённый."""
+"""Ежедневный материал: загрузка из EPUB брошюр и журналов, кэш по дате, откат на последний сохранённый."""
 from __future__ import annotations
 import asyncio
 import logging
@@ -7,14 +7,16 @@ from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 from .textproc.analyzer import analyze_blocks, priority_order
 from .epub import EpubBrochureManager, EpubError
+from .magazine import WatchtowerManager
 
 log = logging.getLogger("daily_service")
 
 
 class DailyService:
-    def __init__(self, settings, store, translator, epub_manager: EpubBrochureManager | None = None):
+    def __init__(self, settings, store, translator, epub_manager: EpubBrochureManager | None = None, wt_manager: WatchtowerManager | None = None):
         self.s, self.store, self.tr = settings, store, translator
         self.epub_mgr = epub_manager or EpubBrochureManager()
+        self.wt_mgr = wt_manager or WatchtowerManager()
         self._locks: dict[str, asyncio.Lock] = {}
         log.info("[DailyService] Initialized with timezone=%s", self.s.timezone)
 
@@ -60,17 +62,27 @@ class DailyService:
             # Удаляем брошюры прошлых лет при наступлении нового года
             self.epub_mgr.clean_old_brochures(day.year)
 
+            # Удаляем полностью пройденные выпуски журналов
+            self.wt_mgr.clean_completed_magazines(day, lang=lang)
+
             # Проверяем и скачиваем брошюру следующего года в октябре
             await self.epub_mgr.check_and_fetch_next_year_in_october(day, lang=lang)
+
+            # Подгружаем свежие журналы «Сторожевая башня» начиная с Августа 2026 года
+            await self.wt_mgr.check_and_fetch_monthly_magazines(day, lang=lang)
 
             try:
                 fetch_start = time.monotonic()
                 epub_path = await self.epub_mgr.fetch_brochure_epub(day.year, lang=lang)
                 parsed = self.epub_mgr.parse_entry_from_epub(epub_path, day, lang=lang)
-                content = self.build(parsed, key, lang=lang)
+
+                # Ищем обсуждаемую статью из журнала «Сторожевая башня» для этой недели
+                article_data = self.wt_mgr.find_article_for_date(day, lang=lang)
+
+                content = self.build(parsed, key, lang=lang, article_data=article_data)
                 total_duration = time.monotonic() - fetch_start
-                log.info("[DailyService Build Success] Built daily content: date=%s lang=%s duration=%.3fs",
-                         key, lang, total_duration)
+                log.info("[DailyService Build Success] Built daily content: date=%s lang=%s duration=%.3fs (has_article=%s)",
+                         key, lang, total_duration, bool(article_data))
             except EpubError as e:
                 log.warning("[DailyService EpubError] Failed to fetch or parse EPUB brochure: date=%s lang=%s error=%s",
                             key, lang, e)
@@ -114,19 +126,46 @@ class DailyService:
         return {"nodes": []}
 
     @classmethod
-    def build(cls, parsed: dict, key: str, lang: str = "ru") -> dict:
+    def build(cls, parsed: dict, key: str, lang: str = "ru", article_data: dict | None = None) -> dict:
         verse_raw = parsed.get("verse", "")
         comment_raw = parsed.get("comment", [])
         raw_blocks = [cls._to_nodes_block(verse_raw)] + [cls._to_nodes_block(c) for c in comment_raw]
 
-        blocks, meta, _ = analyze_blocks(raw_blocks, lang=lang)
-        return {"date": key, "date_label": parsed["date_label"], "title": parsed["title"],
-                "verse": blocks[0], "comment": blocks[1:],
-                "order": priority_order(meta), "meta": {str(k): v for k, v in meta.items()}}
+        blocks, meta, next_id = analyze_blocks(raw_blocks, start_id=0, lang=lang)
+
+        article_res = None
+        if article_data and article_data.get("raw_blocks"):
+            art_raw = [cls._to_nodes_block(b) for b in article_data["raw_blocks"]]
+            art_blocks, art_meta, _ = analyze_blocks(art_raw, start_id=next_id, lang=lang)
+            meta.update(art_meta)
+            article_res = {
+                "title": article_data.get("title", ""),
+                "date_label": article_data.get("date_label", ""),
+                "comment": art_blocks,
+            }
+
+        return {
+            "date": key,
+            "date_label": parsed["date_label"],
+            "title": parsed["title"],
+            "verse": blocks[0],
+            "comment": blocks[1:],
+            "article": article_res,
+            "order": priority_order(meta),
+            "meta": {str(k): v for k, v in meta.items()},
+        }
 
     def public(self, content: dict, translations: dict, status: str, notice=None) -> dict:
-        return {"date": content["date"], "date_label": content["date_label"], "title": content["title"],
-                "verse": content["verse"], "comment": content["comment"], "order": content["order"],
-                "meta": {str(k): v for k, v in content.get("meta", {}).items()},
-                "translations": {str(k): v for k, v in translations.items()},
-                "translations_status": status, "notice": notice}
+        return {
+            "date": content["date"],
+            "date_label": content["date_label"],
+            "title": content["title"],
+            "verse": content["verse"],
+            "comment": content["comment"],
+            "article": content.get("article"),
+            "order": content["order"],
+            "meta": {str(k): v for k, v in content.get("meta", {}).items()},
+            "translations": {str(k): v for k, v in translations.items()},
+            "translations_status": status,
+            "notice": notice,
+        }

@@ -13,6 +13,7 @@ from .store import Store
 from .translation.openrouter import OpenRouterClient
 from .translation.service import TranslationService
 from .epub import EpubBrochureManager, EpubError
+from .magazine import WatchtowerManager
 
 log = logging.getLogger("reader")
 
@@ -26,7 +27,7 @@ def _resolve_lang(lang_param: str | None, en_param: str | None) -> str:
     return "ru"
 
 
-def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManager | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManager | None = None, wt_manager: WatchtowerManager | None = None) -> FastAPI:
     s = settings or get_settings()
     store = Store(s.db_path)
     client = OpenRouterClient(s.openrouter_api_key, s.openrouter_model) if s.openrouter_api_key else None
@@ -34,7 +35,8 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
         log.warning("OPENROUTER_API_KEY не задан: перевод отключён, текст останется на русском")
     tr = TranslationService(store, client, s.translate_max_share)
     epub_mgr = epub_manager or EpubBrochureManager()
-    daily = DailyService(s, store, tr, epub_manager=epub_mgr)
+    wt_mgr = wt_manager or WatchtowerManager()
+    daily = DailyService(s, store, tr, epub_manager=epub_mgr, wt_manager=wt_mgr)
     app = FastAPI(title="Daily Reader")
     origins = [
         o.strip().rstrip("/")
@@ -256,6 +258,9 @@ def create_app(settings: Settings | None = None, epub_manager: EpubBrochureManag
 
 def _flatten_daily_text(content: dict) -> str:
     blocks = [content.get("verse", {})] + list(content.get("comment", []))
+    article = content.get("article")
+    if article and isinstance(article, dict):
+        blocks += list(article.get("comment", []))
     out = []
     for block in blocks:
         out.append("".join(_flatten_nodes(block.get("nodes", []))))
