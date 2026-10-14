@@ -319,7 +319,7 @@ export default function App() {
                 fontSize: "14px",
               }}
             >
-              Латинский русский
+              Fonética
             </a>
           </div>
         )}
