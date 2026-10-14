@@ -4,6 +4,8 @@ import {
   loadLearnedWords,
   addLearnedWord,
   removeLearnedWord,
+  loadDailyReadStatus,
+  saveDailyReadStatus,
 } from "./lib/storage.js";
 import {
   normalizeLemma,
@@ -19,11 +21,11 @@ import { transliterateBlock, transliterateRussianToLatin } from "./lib/translite
 const BUILD_ID = "2026.10.10.v14";
 
 function flattenText(nodes) {
-  return nodes.map((n) => {
-    if (n.t === "text") return n.s;
+  return nodes ? nodes.map((n) => {
+    if (n.t === "text" || n.t === "w") return n.s;
     if (n.c) return flattenText(n.c);
     return "";
-  }).join("");
+  }).join("") : "";
 }
 
 function articleContext(data) {
@@ -34,6 +36,15 @@ function articleContext(data) {
     ...(data.article?.comment || [])
   ];
   return blocks.map((block) => flattenText(block?.nodes || [])).join(" ");
+}
+
+function countWordsInBlocks(verse, comment) {
+  const text = [
+    flattenText(verse?.nodes || []),
+    ...(comment || []).map((b) => flattenText(b?.nodes || []))
+  ].join(" ");
+  const matches = text.match(/[\p{L}\p{N}]+/gu);
+  return matches ? matches.length : 0;
 }
 
 export default function App() {
@@ -47,11 +58,56 @@ export default function App() {
   const [isDebug, setIsDebug] = useState(false);
   const [swControlled, setSwControlled] = useState(false);
 
-  // Clear token translations and loading states when date or mode changes
+  // View state: 'daily' or 'article'
+  const [activeTab, setActiveTab] = useState("daily");
+  const [isRead, setIsRead] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const wordCount = useMemo(() => {
+    if (!data) return 0;
+    return countWordsInBlocks(data.verse, data.comment);
+  }, [data]);
+
+  // Target required reading time: ~180 wpm (e.g. 150 words = ~50s), minimum 10s
+  const requiredSeconds = useMemo(() => {
+    if (wordCount <= 0) return 10;
+    const calculated = Math.round((wordCount / 180) * 60);
+    return Math.max(10, Math.min(300, calculated));
+  }, [wordCount]);
+
+  // Sync read status and default active tab when date changes
   useEffect(() => {
+    if (data?.date) {
+      const readStatus = loadDailyReadStatus(data.date);
+      setIsRead(readStatus);
+      setElapsedSeconds(readStatus ? requiredSeconds : 0);
+      if (readStatus && data.article) {
+        setActiveTab("article");
+      } else {
+        setActiveTab("daily");
+      }
+    }
     setTokenTranslations({});
     setLoadingTokens({});
-  }, [data?.date, mode.id]);
+  }, [data?.date, mode.id, data?.article]);
+
+  // Active reading timer when in 'daily' tab and not yet marked as read
+  useEffect(() => {
+    if (!data?.date || isRead || activeTab !== "daily") {
+      return;
+    }
+    const timer = setInterval(() => {
+      setElapsedSeconds((prev) => {
+        const next = prev + 1;
+        if (next >= requiredSeconds) {
+          setIsRead(true);
+          saveDailyReadStatus(data.date, true);
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [data?.date, isRead, activeTab, requiredSeconds]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -262,45 +318,65 @@ export default function App() {
         {notice && <p className="notice" role="status">{notice}</p>}
         {data ? (
           <article>
-            <h1>{data.date_label}</h1>
-            {displayVerse && (
-              <Scripture
-                block={displayVerse}
-                translations={visibleTranslations}
-                loadingTokens={loadingTokens}
-                onWordClick={handleWordClick}
-                onWordLongPress={handleWordLongPress}
-                meta={data.meta || {}}
-                sourceLang={sourceLang}
-                targetLang={targetLang}
-                lang={targetLang}
-              />
-            )}
-            <Comment
-              blocks={displayComment}
-              translations={visibleTranslations}
-              loadingTokens={loadingTokens}
-              onWordClick={handleWordClick}
-              onWordLongPress={handleWordLongPress}
-              meta={data.meta || {}}
-              sourceLang={sourceLang}
-              targetLang={targetLang}
-              lang={targetLang}
-            />
-            {data.title && <p className="source">{data.title}</p>}
+            {/* Navigation and Transition Bar */}
             {data.article && (
-              <section className="study-article">
-                <header className="study-article-header">
-                  <span className="study-article-badge">
-                    {targetLang === "es" ? "Artículo de estudio" : (sourceLang === "en" ? "Study Article" : "Статья для изучения")}
-                  </span>
-                  <h2>{data.article.title}</h2>
-                  {data.article.date_range_label && (
-                    <p className="study-article-dates">{data.article.date_range_label}</p>
-                  )}
-                </header>
+              <div className="view-toggle-bar">
+                {activeTab === "daily" ? (
+                  isRead ? (
+                    <button
+                      type="button"
+                      className="article-transition-btn unlocked"
+                      onClick={() => setActiveTab("article")}
+                    >
+                      {targetLang === "es"
+                        ? "Ir al artículo de estudio →"
+                        : (sourceLang === "en" ? "Go to Study Article →" : "Перейти к статье для изучения →")}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="article-transition-btn locked"
+                      disabled
+                    >
+                      {targetLang === "es"
+                        ? `Lea el comentario del día (${Math.max(0, requiredSeconds - elapsedSeconds)}s)`
+                        : (sourceLang === "en"
+                          ? `Read daily comment (${Math.max(0, requiredSeconds - elapsedSeconds)}s)`
+                          : `Прочитайте комментарий (${Math.max(0, requiredSeconds - elapsedSeconds)}с)`)}
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className="article-transition-btn back"
+                    onClick={() => setActiveTab("daily")}
+                  >
+                    {targetLang === "es"
+                      ? "← Volver al texto del día"
+                      : (sourceLang === "en" ? "← Back to Daily Text" : "← Назад к тексту на день")}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === "daily" ? (
+              <>
+                <h1>{data.date_label}</h1>
+                {displayVerse && (
+                  <Scripture
+                    block={displayVerse}
+                    translations={visibleTranslations}
+                    loadingTokens={loadingTokens}
+                    onWordClick={handleWordClick}
+                    onWordLongPress={handleWordLongPress}
+                    meta={data.meta || {}}
+                    sourceLang={sourceLang}
+                    targetLang={targetLang}
+                    lang={targetLang}
+                  />
+                )}
                 <Comment
-                  blocks={displayArticleComment}
+                  blocks={displayComment}
                   translations={visibleTranslations}
                   loadingTokens={loadingTokens}
                   onWordClick={handleWordClick}
@@ -310,7 +386,33 @@ export default function App() {
                   targetLang={targetLang}
                   lang={targetLang}
                 />
-              </section>
+                {data.title && <p className="source">{data.title}</p>}
+              </>
+            ) : (
+              data.article && (
+                <section className="study-article">
+                  <header className="study-article-header">
+                    <span className="study-article-badge">
+                      {targetLang === "es" ? "Artículo de estudio" : (sourceLang === "en" ? "Study Article" : "Статья для изучения")}
+                    </span>
+                    <h2>{data.article.title}</h2>
+                    {data.article.date_range_label && (
+                      <p className="study-article-dates">{data.article.date_range_label}</p>
+                    )}
+                  </header>
+                  <Comment
+                    blocks={displayArticleComment}
+                    translations={visibleTranslations}
+                    loadingTokens={loadingTokens}
+                    onWordClick={handleWordClick}
+                    onWordLongPress={handleWordLongPress}
+                    meta={data.meta || {}}
+                    sourceLang={sourceLang}
+                    targetLang={targetLang}
+                    lang={targetLang}
+                  />
+                </section>
+              )
             )}
           </article>
         ) : loading ? (

@@ -397,11 +397,59 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   text-decoration: underline !important;
 }
 
+/* View Toggle / Article Transition Bar */
+.view-toggle-bar {
+  margin-bottom: 1.5rem;
+}
+
+.article-transition-btn {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid var(--accent);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.article-transition-btn.unlocked {
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: 0 3px 12px rgba(15, 107, 99, 0.25);
+}
+
+.article-transition-btn.unlocked:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.article-transition-btn.locked {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--rule);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.article-transition-btn.back {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.article-transition-btn.back:hover {
+  background: var(--panel);
+}
+
 /* Watchtower Study Article section */
 .study-article {
-  margin-top: 2.5rem;
-  padding-top: 1.75rem;
-  border-top: 1px solid var(--rule);
+  margin-top: 0.5rem;
 }
 
 .study-article-header {
