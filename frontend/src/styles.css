@@ -42,6 +42,7 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
   appearance: none;
   line-height: inherit;
   vertical-align: baseline;
+  white-space: nowrap;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
@@ -71,6 +72,7 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 .word--loading {
   color: #889690;
   cursor: wait;
+  white-space: nowrap;
 }
 
 .word-letter {
