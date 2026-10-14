@@ -297,7 +297,7 @@ export default function App() {
                 fontSize: "14px",
               }}
             >
-              Leer en español
+              Читать на испанском
             </a>
             <a
               href="/ru-es-translit/"
@@ -319,7 +319,7 @@ export default function App() {
                 fontSize: "14px",
               }}
             >
-              Leer más rápido
+              Латинский русский
             </a>
           </div>
         )}
@@ -347,7 +347,7 @@ export default function App() {
                 fontSize: "14px",
               }}
             >
-              Leer en ruso
+              Чтение на русском
             </a>
           </div>
         )}
