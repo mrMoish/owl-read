@@ -339,10 +339,10 @@ export default function App() {
                       disabled
                     >
                       {targetLang === "es"
-                        ? `Lea el comentario del día (${Math.max(0, requiredSeconds - elapsedSeconds)}s)`
+                        ? "Lea el comentario del día"
                         : (sourceLang === "en"
-                          ? `Read daily comment (${Math.max(0, requiredSeconds - elapsedSeconds)}s)`
-                          : `Прочитайте комментарий (${Math.max(0, requiredSeconds - elapsedSeconds)}с)`)}
+                          ? "Read daily comment"
+                          : "Прочитайте комментарий")}
                     </button>
                   )
                 ) : (
