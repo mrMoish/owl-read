@@ -78,6 +78,11 @@ function WordSpan({ id, word, info, translated, isLoading, content, wordLang, la
     }
   };
 
+  const letters = Array.from(content);
+  const totalLetters = letters.length;
+  const stepDuration = 0.15;
+  const animDuration = Math.max(0.8, totalLetters * stepDuration);
+
   return (
     <span
       lang={wordLang}
@@ -110,7 +115,22 @@ function WordSpan({ id, word, info, translated, isLoading, content, wordLang, la
           : (targetLang === "es" ? `Traducir palabra ${word}` : (targetLang === "en" ? `Translate word ${word}` : `Перевести слово ${word}`))
       }
     >
-      {content}
+      {isLoading ? (
+        letters.map((char, i) => (
+          <span
+            key={i}
+            className="word-letter"
+            style={{
+              animationDuration: `${animDuration}s`,
+              animationDelay: `${i * stepDuration}s`,
+            }}
+          >
+            {char}
+          </span>
+        ))
+      ) : (
+        content
+      )}
     </span>
   );
 }
