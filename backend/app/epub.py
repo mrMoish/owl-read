@@ -27,6 +27,78 @@ MONTH_NAMES = {
     "en": ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"],
 }
 
+RU_MONTHS_MAP = {name: i + 1 for i, name in enumerate(MONTH_NAMES["ru"])}
+SPANISH_MONTHS_MAP = {name: i + 1 for i, name in enumerate(MONTH_NAMES["es"])}
+ENGLISH_MONTHS_MAP = {name: i + 1 for i, name in enumerate(MONTH_NAMES["en"])}
+
+
+def parse_watchtower_date_range(text: str, default_year: int = 2026, lang: str = "ru") -> tuple[date, date] | None:
+    text_clean = text.lower().replace("—", "-").replace("–", "-").replace("\xa0", " ").strip()
+    if lang == "ru":
+        m1 = re.search(r"(\d+)\s+([а-я]+)\s*-\s*(\d+)\s+([а-я]+)(?:\s+(\d{4}))?", text_clean)
+        if m1:
+            mo1 = RU_MONTHS_MAP.get(m1.group(2))
+            d1 = int(m1.group(1))
+            mo2 = RU_MONTHS_MAP.get(m1.group(4))
+            d2 = int(m1.group(3))
+            yr = int(m1.group(5)) if m1.group(5) else default_year
+            if mo1 and mo2:
+                s_yr = yr - 1 if mo2 < mo1 and mo1 == 12 else yr
+                return date(s_yr, mo1, d1), date(yr, mo2, d2)
+
+        m2 = re.search(r"(\d+)\s*-\s*(\d+)\s+([а-я]+)(?:\s+(\d{4}))?", text_clean)
+        if m2:
+            d1 = int(m2.group(1))
+            d2 = int(m2.group(2))
+            mo1 = RU_MONTHS_MAP.get(m2.group(3))
+            yr = int(m2.group(4)) if m2.group(4) else default_year
+            if mo1:
+                return date(yr, mo1, d1), date(yr, mo1, d2)
+
+    elif lang == "es":
+        m1 = re.search(r"(\d+)\s+de\s+([a-z]+)\s*(?:-|a)\s*(\d+)\s+de\s+([a-z]+)(?:\s+de\s+(\d{4}))?", text_clean)
+        if m1:
+            mo1 = SPANISH_MONTHS_MAP.get(m1.group(2))
+            d1 = int(m1.group(1))
+            mo2 = SPANISH_MONTHS_MAP.get(m1.group(4))
+            d2 = int(m1.group(3))
+            yr = int(m1.group(5)) if m1.group(5) else default_year
+            if mo1 and mo2:
+                s_yr = yr - 1 if mo2 < mo1 and mo1 == 12 else yr
+                return date(s_yr, mo1, d1), date(yr, mo2, d2)
+
+        m2 = re.search(r"(\d+)\s*-\s*(\d+)\s+de\s+([a-z]+)(?:\s+de\s+(\d{4}))?", text_clean)
+        if m2:
+            d1 = int(m2.group(1))
+            d2 = int(m2.group(2))
+            mo1 = SPANISH_MONTHS_MAP.get(m2.group(3))
+            yr = int(m2.group(4)) if m2.group(4) else default_year
+            if mo1:
+                return date(yr, mo1, d1), date(yr, mo1, d2)
+
+    elif lang == "en":
+        m1 = re.search(r"([a-z]+)\s+(\d+)\s*-\s*([a-z]+)\s+(\d+)(?:,\s*(\d{4}))?", text_clean)
+        if m1:
+            mo1 = ENGLISH_MONTHS_MAP.get(m1.group(1))
+            d1 = int(m1.group(2))
+            mo2 = ENGLISH_MONTHS_MAP.get(m1.group(3))
+            d2 = int(m1.group(4))
+            yr = int(m1.group(5)) if m1.group(5) else default_year
+            if mo1 and mo2:
+                s_yr = yr - 1 if mo2 < mo1 and mo1 == 12 else yr
+                return date(s_yr, mo1, d1), date(yr, mo2, d2)
+
+        m2 = re.search(r"([a-z]+)\s+(\d+)\s*-\s*(\d+)(?:,\s*(\d{4}))?", text_clean)
+        if m2:
+            mo1 = ENGLISH_MONTHS_MAP.get(m2.group(1))
+            d1 = int(m2.group(2))
+            d2 = int(m2.group(3))
+            yr = int(m2.group(4)) if m2.group(4) else default_year
+            if mo1:
+                return date(yr, mo1, d1), date(yr, mo1, d2)
+
+    return None
+
 
 class EpubError(Exception):
     pass
@@ -267,3 +339,169 @@ class EpubBrochureManager:
             if not isinstance(e, EpubError):
                 log.exception("[EPUB Parse Exception] Unexpected error during parse_entry_from_epub: %s", e)
             raise
+
+
+class WatchtowerEPUBManager:
+    def __init__(self, storage_dir: Path | str | None = None):
+        if storage_dir is None:
+            storage_dir = Path("/tmp/owl_brochures")
+        self.storage_dir = Path(storage_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        log.info("[Watchtower Manager] Initialized storage_dir=%s", self.storage_dir)
+
+    def _get_epub_path(self, issue_code: str, lang: str) -> Path:
+        return self.storage_dir / f"w_{lang}_{issue_code}.epub"
+
+    async def fetch_watchtower_epub(self, issue_code: str, lang: str = "ru", client: httpx.AsyncClient | None = None) -> Path:
+        dest_path = self._get_epub_path(issue_code, lang)
+        if dest_path.exists() and dest_path.stat().st_size > 0:
+            log.info("[Watchtower Fetch] Cached EPUB file found: issue=%s lang=%s path=%s", issue_code, lang, dest_path)
+            return dest_path
+
+        lang_code = LANG_MAP.get(lang, "U")
+        api_url = f"https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json&pub=w&issue={issue_code}&fileformat=EPUB&alllangs=0&langwritten={lang_code}"
+
+        close_client = False
+        if client is None:
+            client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+            close_client = True
+
+        try:
+            res = await client.get(api_url)
+            if res.status_code != 200:
+                raise EpubError(f"HTTP {res.status_code} при запросе ссылок на журнал w ({issue_code}, {lang})")
+
+            data = res.json()
+            file_url = None
+            try:
+                files = data["files"][lang_code]["EPUB"]
+                if files:
+                    file_url = files[0]["file"]["url"]
+            except (KeyError, IndexError, TypeError):
+                pass
+
+            if not file_url:
+                raise EpubError(f"EPUB файл журнала не найден для w ({issue_code}, {lang})")
+
+            dl_res = await client.get(file_url)
+            if dl_res.status_code != 200:
+                raise EpubError(f"HTTP {dl_res.status_code} при скачивании журнала")
+
+            tmp_path = dest_path.with_suffix(".tmp")
+            tmp_path.write_bytes(dl_res.content)
+            tmp_path.replace(dest_path)
+            log.info("[Watchtower Fetch Success] Saved EPUB magazine w_%s_%s -> %s", lang, issue_code, dest_path)
+            return dest_path
+        except Exception as e:
+            if not isinstance(e, EpubError):
+                log.exception("[Watchtower Fetch Exception] Unexpected error during fetch_watchtower_epub: %s", e)
+            raise
+        finally:
+            if close_client:
+                await client.aclose()
+
+    def parse_article_from_epub(self, epub_path: Path, day: date, lang: str = "ru") -> dict | None:
+        if not epub_path.exists():
+            return None
+        try:
+            with zipfile.ZipFile(epub_path, "r") as z:
+                for name in z.namelist():
+                    if name.endswith(".xhtml") and "extracted" not in name:
+                        content = z.read(name).decode("utf-8", errors="replace")
+                        soup = BeautifulSoup(content, "html.parser")
+
+                        p_context = soup.find("p", class_=re.compile(r"contextTtl"))
+                        hdr = p_context or soup.find("header") or soup.find(["h1", "h2"])
+                        hdr_text = hdr.get_text().strip() if hdr else ""
+                        dr = parse_watchtower_date_range(hdr_text, default_year=day.year, lang=lang)
+
+                        if dr and (dr[1] - dr[0]).days <= 10 and dr[0] <= day <= dr[1]:
+                            title = ""
+                            for h1 in soup.find_all("h1"):
+                                t = h1.get_text().strip()
+                                if t:
+                                    title = t
+                                    break
+
+                            p_theme = soup.find("p", class_=re.compile(r"themeScrp"))
+                            theme_scrp = p_theme.get_text().strip() if p_theme else ""
+
+                            paragraphs = []
+                            if theme_scrp:
+                                paragraphs.append(theme_scrp)
+
+                            for elem in soup.find_all(["h2", "h3", "p"]):
+                                cl = " ".join(elem.get("class", []))
+                                t = elem.get_text().strip()
+                                if not t:
+                                    continue
+                                if "contextTtl" in cl or "pubRefs" in cl or "extScrpCiteTxt" in cl:
+                                    continue
+                                if p_theme and elem == p_theme:
+                                    continue
+                                paragraphs.append(t)
+
+                            return {
+                                "title": title or hdr_text,
+                                "date_range_label": hdr_text,
+                                "start_date": dr[0].isoformat(),
+                                "end_date": dr[1].isoformat(),
+                                "paragraphs": paragraphs,
+                            }
+        except Exception as e:
+            log.warning("[Watchtower Parse Exception] Error reading %s: %s", epub_path, e)
+        return None
+
+    async def get_article_for_date(self, day: date, lang: str = "ru", client: httpx.AsyncClient | None = None) -> dict | None:
+        y, m = day.year, day.month
+        est_m = m - 2
+        est_y = y
+        if est_m <= 0:
+            est_m += 12
+            est_y -= 1
+
+        candidate_yms = [
+            (est_y, est_m),
+            (est_y, est_m - 1 if est_m > 1 else 12),
+            (est_y, est_m + 1 if est_m < 12 else 1),
+            (est_y, est_m + 2 if est_m < 11 else est_m + 2 - 12),
+        ]
+
+        for cy, cm in candidate_yms:
+            if cy < 2026 or (cy == 2026 and cm < 8):
+                continue
+            issue_code = f"{cy}{cm:02d}"
+            try:
+                epub_path = await self.fetch_watchtower_epub(issue_code, lang=lang, client=client)
+                article = self.parse_article_from_epub(epub_path, day, lang=lang)
+                if article:
+                    return article
+            except Exception as e:
+                log.info("[Watchtower] Issue %s (%s) not available or error: %s", issue_code, lang, e)
+                continue
+
+        return None
+
+    def clean_expired_magazines(self, current_date: date, lang: str = "ru"):
+        """при прохождение всего журнала удалять его"""
+        for file in self.storage_dir.glob(f"w_{lang}_*.epub"):
+            try:
+                max_end = None
+                with zipfile.ZipFile(file, "r") as z:
+                    for name in z.namelist():
+                        if name.endswith(".xhtml") and "extracted" not in name:
+                            content = z.read(name).decode("utf-8", errors="replace")
+                            soup = BeautifulSoup(content, "html.parser")
+                            p_context = soup.find("p", class_=re.compile(r"contextTtl"))
+                            hdr = p_context or soup.find("header") or soup.find(["h1", "h2"])
+                            hdr_text = hdr.get_text().strip() if hdr else ""
+                            dr = parse_watchtower_date_range(hdr_text, default_year=current_date.year, lang=lang)
+                            if dr:
+                                if max_end is None or dr[1] > max_end:
+                                    max_end = dr[1]
+                if max_end and current_date > max_end:
+                    file.unlink(missing_ok=True)
+                    log.info("[Watchtower Cleanup] Deleted expired magazine %s (max_end=%s < current_date=%s)",
+                             file.name, max_end.isoformat(), current_date.isoformat())
+            except Exception as e:
+                log.warning("[Watchtower Cleanup Warning] Could not clean file %s: %s", file.name, e)
