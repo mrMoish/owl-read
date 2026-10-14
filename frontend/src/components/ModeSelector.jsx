@@ -18,7 +18,12 @@ export default function ModeSelector() {
           <a
             key={m.id}
             href={m.path}
-            onClick={() => saveSelectedMode(m.id)}
+            target="_self"
+            onClick={(e) => {
+              e.preventDefault();
+              saveSelectedMode(m.id);
+              window.location.href = m.path;
+            }}
             className="mode-card"
             style={{
               display: "block",

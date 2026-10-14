@@ -279,8 +279,13 @@ export default function App() {
           <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
             <a
               href="/ru-es-translit/"
+              target="_self"
               className="temp-nav-btn"
-              onClick={() => saveSelectedMode("ru-es-translit")}
+              onClick={(e) => {
+                e.preventDefault();
+                saveSelectedMode("ru-es-translit");
+                window.location.href = "/ru-es-translit/";
+              }}
               style={{
                 display: "inline-block",
                 padding: "8px 16px",
@@ -302,8 +307,13 @@ export default function App() {
           <div className="temp-nav-banner" style={{ marginBottom: "16px", textAlign: "center" }}>
             <a
               href="/es-ru-translit/"
+              target="_self"
               className="temp-nav-btn"
-              onClick={() => saveSelectedMode("es-ru-translit")}
+              onClick={(e) => {
+                e.preventDefault();
+                saveSelectedMode("es-ru-translit");
+                window.location.href = "/es-ru-translit/";
+              }}
               style={{
                 display: "inline-block",
                 padding: "8px 16px",
