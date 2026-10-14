@@ -21,12 +21,16 @@ export default function SettingsFab({
   // Long press on any part of the page opens settings bottom sheet
   useEffect(() => {
     const handlePointerDown = (e) => {
-      // Don't register long press if user is clicking interactive controls in modal/sheet
+      const targetElem = e.target?.nodeType === 3 ? e.target.parentElement : e.target;
+      if (!targetElem) return;
+
+      // Don't register long press if user is clicking interactive controls or words
       if (
-        e.target.closest(".settings-bottom-sheet") ||
-        e.target.closest("button") ||
-        e.target.closest("input") ||
-        e.target.closest("a")
+        targetElem.closest(".settings-bottom-sheet") ||
+        targetElem.closest(".word") ||
+        targetElem.closest("button") ||
+        targetElem.closest("input") ||
+        targetElem.closest("a")
       ) {
         return;
       }

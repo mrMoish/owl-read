@@ -82,21 +82,20 @@ export default function App() {
   }, [smoothConfig.enabled, smoothConfig.percent, data?.meta?.order, data?.translations]);
 
   const visibleTranslations = useMemo(() => {
-    const combinedPrepared = {
-      ...smoothTranslations,
-      ...(data?.translations || {}),
-      ...tokenTranslations,
-    };
+    const combinedPrepared = smoothConfig.enabled
+      ? { ...smoothTranslations, ...tokenTranslations }
+      : { ...(data?.translations || {}), ...tokenTranslations };
+
     const raw = applyLearnedTranslations({
       meta: data?.meta,
       preparedTranslations: combinedPrepared,
       learnedWords,
     });
-    const merged = {
-      ...smoothTranslations,
-      ...tokenTranslations,
-      ...raw,
-    };
+
+    const merged = smoothConfig.enabled
+      ? { ...smoothTranslations, ...tokenTranslations, ...raw }
+      : { ...tokenTranslations, ...raw };
+
     if (mode.id === "es-ru-translit" && merged) {
       const transliterated = {};
       for (const [k, val] of Object.entries(merged)) {
@@ -109,7 +108,7 @@ export default function App() {
       return transliterated;
     }
     return merged;
-  }, [smoothTranslations, data?.translations, tokenTranslations, learnedWords, data?.meta, mode.id]);
+  }, [smoothConfig.enabled, smoothTranslations, data?.translations, tokenTranslations, learnedWords, data?.meta, mode.id]);
 
   const handleSmoothToggle = (enabled) => {
     const updated = { ...smoothConfig, enabled };

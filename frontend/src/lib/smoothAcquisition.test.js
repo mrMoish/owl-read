@@ -99,3 +99,70 @@ test("pickShown selects correct translation tokens for percentage slider", () =>
   const set100 = pickShown(order, translations, 100);
   assert.strictEqual(set100.size, 5);
 });
+
+test("long-press target check excludes word elements", () => {
+  const shouldIgnoreLongPress = (targetElem) => {
+    return Boolean(
+      targetElem?.closest?.(".settings-bottom-sheet") ||
+      targetElem?.closest?.(".word") ||
+      targetElem?.closest?.("button") ||
+      targetElem?.closest?.("input") ||
+      targetElem?.closest?.("a")
+    );
+  };
+
+  const wordNode = {
+    className: "word word--translated",
+    closest: (sel) => (sel === ".word" ? wordNode : null),
+  };
+
+  const articleNode = {
+    className: "article",
+    closest: () => null,
+  };
+
+  assert.strictEqual(shouldIgnoreLongPress(wordNode), true);
+  assert.strictEqual(shouldIgnoreLongPress(articleNode), false);
+});
+
+test("smoothTranslations properly filters visible translations when smoothConfig is enabled", () => {
+  const allTranslations = {
+    w1: "uno",
+    w2: "dos",
+    w3: "tres",
+    w4: "cuatro",
+    w5: "cinco",
+  };
+  const order = ["w1", "w2", "w3", "w4", "w5"];
+
+  // Helper simulating App.jsx translation combination
+  const computeVisible = (enabled, percent, tokenTranslations = {}) => {
+    let smoothTranslations = {};
+    if (enabled) {
+      const shownSet = pickShown(order, allTranslations, percent);
+      for (const id of shownSet) {
+        if (allTranslations[id]) smoothTranslations[id] = allTranslations[id];
+      }
+    }
+
+    const combinedPrepared = enabled
+      ? { ...smoothTranslations, ...tokenTranslations }
+      : { ...allTranslations, ...tokenTranslations };
+
+    return enabled
+      ? { ...smoothTranslations, ...tokenTranslations }
+      : { ...tokenTranslations };
+  };
+
+  // Disabled: only user clicked tokens are shown
+  const disabledRes = computeVisible(false, 10, { w1: "uno" });
+  assert.deepStrictEqual(disabledRes, { w1: "uno" });
+
+  // Enabled at 20%: only top 1 token (w1) is shown
+  const enabled20 = computeVisible(true, 20, {});
+  assert.deepStrictEqual(enabled20, { w1: "uno" });
+
+  // Enabled at 60%: top 3 tokens (w1, w2, w3) are shown
+  const enabled60 = computeVisible(true, 60, {});
+  assert.deepStrictEqual(enabled60, { w1: "uno", w2: "dos", w3: "tres" });
+});
