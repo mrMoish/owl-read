@@ -521,28 +521,3 @@ h1 { font-size: 1.6rem; line-height: 1.2; font-weight: 600; margin: 0 0 1.25rem;
 .toggle-switch-label input:checked + .toggle-slider::before {
   transform: translateX(22px);
 }
-
-.settings-mode-transitions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--rule);
-}
-
-.mode-transition-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  background-color: var(--accent);
-  color: var(--bg) !important;
-  text-decoration: none !important;
-  font-size: 0.88rem;
-  font-weight: 500;
-  transition: opacity 0.15s ease;
-}
-
-.mode-transition-btn:hover {
-  opacity: 0.9;
-}

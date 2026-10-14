@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { getSmoothToggleLabel, getModeTransitions } from "../lib/modes.js";
+import { getSmoothToggleLabel } from "../lib/modes.js";
 
 export default function SettingsFab({
   mode = { id: "ru-es" },
@@ -75,7 +75,6 @@ export default function SettingsFab({
   }, []);
 
   const toggleLabel = getSmoothToggleLabel(mode?.id);
-  const transitions = getModeTransitions(mode?.id);
 
   return (
     <>
@@ -124,16 +123,6 @@ export default function SettingsFab({
                 <span className="toggle-slider" />
               </label>
             </div>
-
-            {transitions.length > 0 && (
-              <div className="settings-mode-transitions">
-                {transitions.map((t) => (
-                  <a key={t.path} href={t.path} className="mode-transition-btn">
-                    {t.label}
-                  </a>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       )}

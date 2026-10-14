@@ -7,7 +7,7 @@ import {
   loadUserSettings,
   saveUserSettings,
 } from "./storage.js";
-import { getSmoothToggleLabel, getModeTransitions } from "./modes.js";
+import { getSmoothToggleLabel } from "./modes.js";
 import { pickShown } from "./selection.js";
 
 // Mock localStorage for node environment if not present
@@ -27,29 +27,6 @@ test("getSmoothToggleLabel returns correct toggle switch label per mode", () => 
   assert.strictEqual(getSmoothToggleLabel("en-ru"), "плавное освоение английского");
   assert.strictEqual(getSmoothToggleLabel("ru-es-translit"), "плавное освоение русского");
   assert.strictEqual(getSmoothToggleLabel("es-ru-translit"), "плавное освоение испанского");
-});
-
-test("getModeTransitions returns expected navigation targets per mode", () => {
-  assert.deepStrictEqual(getModeTransitions("ru-es"), [
-    { path: "/es-ru/", label: "Перейти в режим es-ru" },
-  ]);
-
-  assert.deepStrictEqual(getModeTransitions("es-ru"), [
-    { path: "/ru-es/", label: "Перейти в режим ru-es" },
-    { path: "/ru-es-translit/", label: "Перейти в режим ru-es-translit" },
-  ]);
-
-  assert.deepStrictEqual(getModeTransitions("en-ru"), [
-    { path: "/en-ru/", label: "Перейти в режим en-ru" },
-  ]);
-
-  assert.deepStrictEqual(getModeTransitions("ru-es-translit"), [
-    { path: "/es-ru-translit/", label: "Перейти в режим es-ru-translit" },
-  ]);
-
-  assert.deepStrictEqual(getModeTransitions("es-ru-translit"), [
-    { path: "/ru-es-translit/", label: "Перейти в режим ru-es-translit" },
-  ]);
 });
 
 test("loadSmoothSettings defaults to disabled (enabled: false) and percent: 10", () => {

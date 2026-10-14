@@ -94,25 +94,3 @@ export function getSmoothToggleLabel(modeId = "ru-es") {
   if (modeId === "es-ru" || modeId === "es-ru-translit") return "плавное освоение испанского";
   return "плавное освоение русского";
 }
-
-export function getModeTransitions(modeId = "ru-es") {
-  if (modeId === "ru-es") {
-    return [{ path: "/es-ru/", label: "Перейти в режим es-ru" }];
-  }
-  if (modeId === "es-ru") {
-    return [
-      { path: "/ru-es/", label: "Перейти в режим ru-es" },
-      { path: "/ru-es-translit/", label: "Перейти в режим ru-es-translit" },
-    ];
-  }
-  if (modeId === "en-ru") {
-    return [{ path: "/en-ru/", label: "Перейти в режим en-ru" }];
-  }
-  if (modeId === "ru-es-translit") {
-    return [{ path: "/es-ru-translit/", label: "Перейти в режим es-ru-translit" }];
-  }
-  if (modeId === "es-ru-translit") {
-    return [{ path: "/ru-es-translit/", label: "Перейти в режим ru-es-translit" }];
-  }
-  return [];
-}
