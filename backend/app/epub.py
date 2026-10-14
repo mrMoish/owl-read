@@ -233,19 +233,19 @@ class EpubBrochureManager:
 
                 comment_paragraphs = []
                 body_div = search_context.find("div", class_=re.compile(r"bodyTxt|pGroup|section"))
-                if body_div:
-                    for p in body_div.find_all("p"):
-                        if p != verse_elem:
-                            t = p.get_text().strip()
-                            if t:
-                                comment_paragraphs.append(t)
-
-                if not comment_paragraphs:
-                    for p in search_context.find_all("p"):
-                        if p != verse_elem:
-                            t = p.get_text().strip()
-                            if t and not (date_label and t in date_label):
-                                comment_paragraphs.append(t)
+                p_nodes = body_div.find_all("p") if body_div else search_context.find_all("p")
+                for p in p_nodes:
+                    if p != verse_elem:
+                        # Удаляем сноску/ссылку и метку источника брошюры в конце абзаца (например, w24.12 23, абз. 13, 14)
+                        for elem in p.find_all(["a", "span"], id=re.compile(r"pcitationsource")):
+                            elem.decompose()
+                        for elem in p.find_all("a", href=re.compile(r"extracted|pcitation")):
+                            elem.decompose()
+                        # А также удаляем текст ссылки, если он остался без тегов или в виде устоявшегося паттерна источника (например w24.12 ..., w25.01 ...)
+                        t = p.get_text().strip()
+                        t = re.sub(r"\s*w\d{2}\.\d{2}\b.*$", "", t).strip()
+                        if t and not (date_label and t in date_label):
+                            comment_paragraphs.append(t)
 
                 elapsed = time.monotonic() - start_time
                 log.info("[EPUB Parse Success] Successfully parsed entry: file=%s date=%s date_label=%s verse_len=%d paragraphs=%d duration=%.3fs",

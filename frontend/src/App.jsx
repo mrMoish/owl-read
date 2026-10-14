@@ -275,7 +275,6 @@ export default function App() {
               targetLang={targetLang}
               lang={targetLang}
             />
-            {data.title && <p className="source">{data.title}</p>}
           </article>
         ) : loading ? (
           <p className="notice" role="status">
