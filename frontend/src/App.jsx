@@ -28,8 +28,12 @@ function flattenText(nodes) {
 
 function articleContext(data) {
   if (!data) return "";
-  const blocks = [data.verse, ...(data.comment || [])];
-  return blocks.map((block) => flattenText(block.nodes || [])).join(" ");
+  const blocks = [
+    data.verse,
+    ...(data.comment || []),
+    ...(data.article?.comment || [])
+  ];
+  return blocks.map((block) => flattenText(block?.nodes || [])).join(" ");
 }
 
 export default function App() {
@@ -99,6 +103,14 @@ export default function App() {
     }
     return data.comment;
   }, [data?.comment, mode.transliterate, sourceLang, targetLang]);
+
+  const displayArticleComment = useMemo(() => {
+    if (!data?.article?.comment) return [];
+    if (mode.transliterate && mode.source === "ru") {
+      return data.article.comment.map((b) => transliterateBlock(b, sourceLang, targetLang));
+    }
+    return data.article.comment;
+  }, [data?.article?.comment, mode.transliterate, sourceLang, targetLang]);
 
   const handleWordClick = async ({ id, word, sentence, context, lemma }) => {
     if (!data?.date || !sentence) {
@@ -276,6 +288,30 @@ export default function App() {
               lang={targetLang}
             />
             {data.title && <p className="source">{data.title}</p>}
+            {data.article && (
+              <section className="study-article">
+                <header className="study-article-header">
+                  <span className="study-article-badge">
+                    {targetLang === "es" ? "Artículo de estudio" : (sourceLang === "en" ? "Study Article" : "Статья для изучения")}
+                  </span>
+                  <h2>{data.article.title}</h2>
+                  {data.article.date_range_label && (
+                    <p className="study-article-dates">{data.article.date_range_label}</p>
+                  )}
+                </header>
+                <Comment
+                  blocks={displayArticleComment}
+                  translations={visibleTranslations}
+                  loadingTokens={loadingTokens}
+                  onWordClick={handleWordClick}
+                  onWordLongPress={handleWordLongPress}
+                  meta={data.meta || {}}
+                  sourceLang={sourceLang}
+                  targetLang={targetLang}
+                  lang={targetLang}
+                />
+              </section>
+            )}
           </article>
         ) : loading ? (
           <p className="notice" role="status">

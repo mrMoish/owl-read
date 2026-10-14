@@ -10,7 +10,7 @@ from app.store import Store
 from app.daily import DailyService
 from app.translation.service import TranslationService
 from app.translation.openrouter import OpenRouterClient, parse_response
-from app.epub import EpubBrochureManager, EpubError
+from app.epub import EpubBrochureManager, WatchtowerEPUBManager, parse_watchtower_date_range, EpubError
 
 
 class DummyEpubManager(EpubBrochureManager):
@@ -260,3 +260,89 @@ def test_real_epub_parser_multi_day(tmp_path):
     assert res["date_label"] == "6 октября"
     assert "Закон — это лишь тень" in res["verse"]
     assert "Христианам в Иудее" in res["comment"][0]
+
+
+def test_parse_watchtower_date_range():
+    dr_ru1 = parse_watchtower_date_range("5—11 ОКТЯБРЯ 2026 ГОДА", 2026, "ru")
+    assert dr_ru1 == (date(2026, 10, 5), date(2026, 10, 11))
+
+    dr_ru2 = parse_watchtower_date_range("26 ОКТЯБРЯ — 1 НОЯБРЯ 2026 ГОДА", 2026, "ru")
+    assert dr_ru2 == (date(2026, 10, 26), date(2026, 11, 1))
+
+    dr_es1 = parse_watchtower_date_range("5-11 DE OCTUBRE DE 2026", 2026, "es")
+    assert dr_es1 == (date(2026, 10, 5), date(2026, 10, 11))
+
+    dr_es2 = parse_watchtower_date_range("26 DE OCTUBRE-1 DE NOVIEMBRE DE 2026", 2026, "es")
+    assert dr_es2 == (date(2026, 10, 26), date(2026, 11, 1))
+
+    dr_en1 = parse_watchtower_date_range("OCTOBER 5-11, 2026", 2026, "en")
+    assert dr_en1 == (date(2026, 10, 5), date(2026, 10, 11))
+
+    dr_en2 = parse_watchtower_date_range("OCTOBER 26–NOVEMBER 1, 2026", 2026, "en")
+    assert dr_en2 == (date(2026, 10, 26), date(2026, 11, 1))
+
+
+def test_watchtower_manager_article_and_cleanup(tmp_path):
+    wt_mgr = WatchtowerEPUBManager(storage_dir=tmp_path)
+    epub_file = tmp_path / "w_ru_202608.epub"
+
+    html_content = """<!DOCTYPE html>
+<html>
+<body>
+  <header>
+    <p class="contextTtl">5—11 ОКТЯБРЯ 2026 ГОДА</p>
+    <h1>Давайте отпор Сатане</h1>
+  </header>
+  <p class="themeScrp">«Противостаньте Дьяволу» (ИАК. 4:7).</p>
+  <p class="qu">1. Как Сатана пытается сломить нашу верность?</p>
+  <p class="p7">С того самого момента, как мы решили служить Иегове...</p>
+</body>
+</html>"""
+
+    with zipfile.ZipFile(epub_file, "w") as z:
+        z.writestr("OEBPS/art1.xhtml", html_content)
+
+    # 1. Parse article for Oct 8, 2026
+    art = wt_mgr.parse_article_from_epub(epub_file, date(2026, 10, 8), lang="ru")
+    assert art is not None
+    assert art["title"] == "Давайте отпор Сатане"
+    assert "Противостаньте Дьяволу" in art["paragraphs"][0]
+
+    # 2. Test cleanup: prior to end date, file remains; after end date, file is deleted
+    wt_mgr.clean_expired_magazines(date(2026, 10, 10), lang="ru")
+    assert epub_file.exists()
+
+    wt_mgr.clean_expired_magazines(date(2026, 10, 12), lang="ru")
+    assert not epub_file.exists()
+
+
+def test_daily_api_includes_watchtower_article(tmp_path):
+    class MockWTManager(WatchtowerEPUBManager):
+        async def get_article_for_date(self, day, lang="ru", client=None):
+            if day == date(2026, 10, 8):
+                return {
+                    "title": "Давайте отпор Сатане",
+                    "date_range_label": "5—11 ОКТЯБРЯ 2026 ГОДА",
+                    "start_date": "2026-10-05",
+                    "end_date": "2026-10-11",
+                    "paragraphs": ["1. Как Сатана пытается сломить нашу верность?", "С того момента..."],
+                }
+            return None
+
+    app = make_app(tmp_path, key="")
+    app.dependency_overrides = {}
+    # Re-instantiate DailyService in app with mock WT manager
+    s = replace(get_settings(), db_path=tmp_path / "t.db", openrouter_api_key="")
+    dummy_brochure = DummyEpubManager()
+    mock_wt = MockWTManager(storage_dir=tmp_path)
+    daily = DailyService(s, Store(s.db_path), None, epub_manager=dummy_brochure, watchtower_manager=mock_wt)
+
+    c = TestClient(app)
+    # Get daily content for Oct 8, 2026
+    content, _ = asyncio.run(daily.get("2026-10-08"))
+    res = daily.public(content, {}, "ondemand")
+
+    assert "article" in res
+    assert res["article"]["title"] == "Давайте отпор Сатане"
+    assert res["article"]["date_range_label"] == "5—11 ОКТЯБРЯ 2026 ГОДА"
+    assert len(res["article"]["comment"]) == 2
